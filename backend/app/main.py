@@ -14,11 +14,10 @@ import re
 import time
 
 import socketio
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
 from app.database import engine, Base, SessionLocal
@@ -51,73 +50,74 @@ api = FastAPI(
     description="Healthcare translation consultation backend",
 )
 
-
-# ── Security Headers Middleware ───────────────────────────────────────
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Inject hardening headers into every response."""
-
-    async def dispatch(self, request: Request, call_next):
-        response: Response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; "
-            "connect-src 'self' ws: wss:; "
-            "frame-ancestors 'none';"
-        )
-        return response
+# ── CORS — must be registered FIRST (before any BaseHTTPMiddleware) ───
+api.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS if settings.CORS_ORIGINS else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-# ── XSS Protection Middleware ─────────────────────────────────────────
+# ── Security Headers — added via @app.middleware to avoid breaking CORS
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self' ws: wss:; "
+        "frame-ancestors 'none';"
+    ),
+}
+
+# ── XSS Protection Pattern ───────────────────────────────────────────
 _XSS_PATTERN = re.compile(
     r"<\s*script|javascript\s*:|on\w+\s*=",
     re.IGNORECASE,
 )
 
 
-class XSSProtectionMiddleware(BaseHTTPMiddleware):
-    """Reject requests whose JSON body contains script-injection patterns."""
+@api.middleware("http")
+async def security_and_xss_middleware(request: Request, call_next):
+    """Combined security-headers + XSS-body-scan middleware.
 
-    async def dispatch(self, request: Request, call_next):
-        if request.method in ("POST", "PUT", "PATCH"):
-            content_type = request.headers.get("content-type", "")
-            if "application/json" in content_type:
-                body_bytes = await request.body()
-                if _XSS_PATTERN.search(body_bytes.decode("utf-8", errors="ignore")):
-                    logger.warning(
-                        "XSS attempt blocked from %s on %s",
-                        request.client.host if request.client else "unknown",
-                        request.url.path,
-                    )
-                    return JSONResponse(
-                        status_code=400,
-                        content={"detail": "Request rejected: potentially unsafe content detected."},
-                    )
-                # Re-inject the body so downstream handlers can read it
-                async def _receive():
-                    return {"type": "http.request", "body": body_bytes}
-                request._receive = _receive
-        return await call_next(request)
+    Uses @app.middleware('http') instead of BaseHTTPMiddleware so that
+    CORSMiddleware headers are never stripped from the response.
+    """
+    # ── XSS body scan (POST / PUT / PATCH with JSON) ─────────────────
+    if request.method in ("POST", "PUT", "PATCH"):
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            body_bytes = await request.body()
+            if _XSS_PATTERN.search(body_bytes.decode("utf-8", errors="ignore")):
+                logger.warning(
+                    "XSS attempt blocked from %s on %s",
+                    request.client.host if request.client else "unknown",
+                    request.url.path,
+                )
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "Request rejected: potentially unsafe content detected."},
+                )
+            # Re-inject body so downstream handlers can read it
+            async def _receive():
+                return {"type": "http.request", "body": body_bytes}
+            request._receive = _receive
 
+    response = await call_next(request)
 
-# Register middleware (order matters — outermost runs first)
-api.add_middleware(SecurityHeadersMiddleware)
-api.add_middleware(XSSProtectionMiddleware)
+    # ── Append security headers ──────────────────────────────────────
+    for key, value in _SECURITY_HEADERS.items():
+        response.headers[key] = value
 
-# CORS
-api.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    return response
 
 # ── register REST routers ─────────────────────────────────────────────
 from app.routes.auth import router as auth_router
