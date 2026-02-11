@@ -40,8 +40,9 @@ class Settings:
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
     CORS_ORIGINS: list[str] = [
-        origin.strip()
+        origin.strip().rstrip("/")
         for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8080").split(",")
+        if origin.strip()
     ]
 
     # ── Uploads ────────────────────────────────────────────────────────

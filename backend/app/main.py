@@ -42,6 +42,8 @@ Base.metadata.create_all(bind=engine)
 if settings.JWT_SECRET == "change-me-in-production":
     logger.warning("⚠  JWT_SECRET is set to the default value — change it before deploying!")
 
+logger.info("CORS_ORIGINS = %s", settings.CORS_ORIGINS)
+
 # ── FastAPI app ───────────────────────────────────────────────────────
 api = FastAPI(
     title="MediBridge Connect API",
@@ -165,6 +167,7 @@ def health():
         "database": db_status,
         "ai_service": ai_status,
         "uptime_seconds": uptime_seconds,
+        "cors_origins": settings.CORS_ORIGINS,
     }
 
 
