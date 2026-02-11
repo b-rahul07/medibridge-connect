@@ -28,8 +28,22 @@ def get_messages(
     session_id: uuid.UUID,
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
-    session = (
+):    """Retrieve all messages for a consultation session.
+
+    Returns messages in chronological order (oldest first). Only participants
+    (the patient and the assigned doctor) are authorized to view messages.
+
+    Args:
+        session_id (uuid.UUID): The consultation session ID.
+        db (DBSession): Database session dependency.
+        current_user (User): Authenticated user from JWT token.
+
+    Returns:
+        List[MessageOut]: Ordered list of messages with original and translated content.
+
+    Raises:
+        HTTPException: 404 if session not found, 403 if user is not a participant.
+    """    session = (
         db.query(ConsultationSession)
         .filter(ConsultationSession.id == session_id)
         .first()
@@ -90,11 +104,29 @@ async def send_message_rest(
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Create a message via REST, broadcast it via Socket.IO, and kick off
-    background translation.  This endpoint serves as a **reliable
-    alternative** to the Socket.IO ``send_message`` event — if the
-    socket is disconnected the frontend can fall back here.
+    """Send a text message via REST with two-phase Socket.IO broadcast.
+
+    This endpoint serves as a reliable alternative to the Socket.IO `send_message`
+    event. If the WebSocket is disconnected, the frontend falls back to this REST
+    endpoint. The message is immediately broadcast untranslated (Phase 1), then
+    GPT-4o translation runs in the background and broadcasts the translated version
+    (Phase 2).
+
+    The endpoint automatically detects the sender's role (patient/doctor) and
+    determines the target language from the OTHER participant's language preference.
+    If the sender provides a language preference, it updates the session record.
+
+    Args:
+        session_id (uuid.UUID): The consultation session ID.
+        body (SendMessageRequest): Message content and optional sender language.
+        db (DBSession): Database session dependency.
+        current_user (User): Authenticated user from JWT token.
+
+    Returns:
+        MessageOut: The created message (without translated_content initially).
+
+    Raises:
+        HTTPException: 404 if session not found, 403 if user is not a participant.
     """
     from app.services.socket_service import sio
 
@@ -162,8 +194,32 @@ async def upload_audio(
     file: UploadFile = File(...),
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
-    from app.services.ai_service import transcribe_audio, translate_text
+):    """Process an audio message: save, transcribe, translate, and broadcast.
+
+    This endpoint handles voice messages by:
+    1. Saving the uploaded audio file to the local upload directory
+    2. Transcribing the audio using Whisper large-v3-turbo
+    3. Translating the transcript using GPT-4o
+    4. Persisting the message with both the transcript and translation
+    5. Broadcasting the complete message via Socket.IO for real-time delivery
+
+    Unlike text messages (which use two-phase broadcast), audio messages are
+    broadcast only once after both transcription and translation complete.
+
+    Args:
+        session_id (str): The consultation session ID (as form data).
+        target_language (str): Target language code for translation (default: 'en').
+        file (UploadFile): The audio file (webm, wav, mp3, etc.).
+        db (DBSession): Database session dependency.
+        current_user (User): Authenticated user from JWT token.
+
+    Returns:
+        MessageOut: The created message with transcript, translation, and audio URL.
+
+    Raises:
+        HTTPException: 404 if session not found.
+        Exception: Logs and raises any file I/O or AI service errors.
+    """    from app.services.ai_service import transcribe_audio, translate_text
 
     sid = uuid.UUID(session_id)
     session = (

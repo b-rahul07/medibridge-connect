@@ -43,7 +43,24 @@ def _resolve_language(code: str) -> str:
 
 # ── Translation ───────────────────────────────────────────────────────
 async def translate_text(text: str, target_language: str) -> str:
-    """Translate *text* into *target_language* using GPT-4o."""
+    """Translate medical text into the target language using GPT-4o.
+
+    Uses a strict system prompt to ensure the model only translates without
+    answering questions or providing explanations. Language codes are mapped
+    to full names (e.g., 'hi' → 'Hindi') to avoid ambiguity with greetings.
+
+    Args:
+        text (str): The source text to translate.
+        target_language (str): ISO 639-1 language code (e.g., 'es', 'hi', 'fr').
+
+    Returns:
+        str: The translated text in the target language. Returns a mock
+            translation if GITHUB_TOKEN is not configured. Returns an error
+            message prefixed with "[Translation failed]" on exceptions.
+
+    Raises:
+        Exception: Logs and catches all exceptions, returning fallback text.
+    """
     if not settings.GITHUB_TOKEN:
         logger.warning("No GITHUB_TOKEN — returning mock translation")
         return f"[Mock Translation to {target_language}]: {text}"
@@ -78,7 +95,23 @@ async def translate_text(text: str, target_language: str) -> str:
 
 # ── Summarisation ─────────────────────────────────────────────────────
 async def summarize_conversation(messages_text: str) -> str:
-    """Generate a clinical summary of a conversation."""
+    """Generate a clinical summary from a doctor-patient conversation.
+
+    Uses GPT-4o to extract key medical information including chief complaint,
+    symptoms discussed, and any recommendations or next steps mentioned.
+
+    Args:
+        messages_text (str): The full conversation transcript, typically
+            formatted as "Sender: message\n" line by line.
+
+    Returns:
+        str: A concise clinical summary suitable for medical documentation.
+            Returns a mock summary if GITHUB_TOKEN is not configured. Returns
+            "[Summary generation failed]" on exceptions.
+
+    Raises:
+        Exception: Logs and catches all exceptions, returning fallback text.
+    """
     if not settings.GITHUB_TOKEN:
         return "[Mock Summary] This is a placeholder summary."
 
@@ -108,7 +141,23 @@ async def summarize_conversation(messages_text: str) -> str:
 
 # ── Whisper transcription ─────────────────────────────────────────────
 async def transcribe_audio(filepath: str) -> str:
-    """Transcribe an audio file using OpenAI Whisper via GitHub Models."""
+    """Transcribe an audio file to text using Whisper large-v3-turbo.
+
+    Uploads the audio file to the GitHub Models Whisper endpoint and returns
+    the recognized speech as text. Supports multiple languages and handles
+    various audio formats (webm, wav, mp3, etc.).
+
+    Args:
+        filepath (str): Absolute path to the audio file on the local filesystem.
+
+    Returns:
+        str: The transcribed text. Returns a mock transcription if GITHUB_TOKEN
+            is not configured. Returns "[Audio transcription failed]" on exceptions.
+
+    Raises:
+        Exception: Logs and catches all exceptions (file I/O, API errors),
+            returning fallback text.
+    """
     if not settings.GITHUB_TOKEN:
         return "[Mock transcription of audio]"
 

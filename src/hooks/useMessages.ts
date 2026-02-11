@@ -31,12 +31,12 @@ export const useMessages = (sessionId: string) => {
     // B) Shared Socket.IO instance from api.ts
     const socket = getSocket();
     setConnected(socket.connected);
-    console.log('[WS] Socket state — connected:', socket.connected, 'id:', socket.id);
+    if (import.meta.env.DEV) console.log('[WS] Socket state — connected:', socket.connected, 'id:', socket.id);
 
     // Join the session room (server groups messages by room)
     const joinRoom = () => {
       if (joinedRef.current) return;
-      console.log('[WS] Emitting join_room for session', sessionId, '| socket.connected:', socket.connected);
+      if (import.meta.env.DEV) console.log('[WS] Emitting join_room for session', sessionId, '| socket.connected:', socket.connected);
       socket.emit('join_room', { session_id: sessionId });
       joinedRef.current = true;
     };
@@ -47,7 +47,7 @@ export const useMessages = (sessionId: string) => {
     }
     // Always register the connect handler so we re-join after reconnects
     const onConnect = () => {
-      console.log('[WS] (Re)connected — id:', socket.id, '— re-joining room', sessionId);
+      if (import.meta.env.DEV) console.log('[WS] (Re)connected — id:', socket.id, '— re-joining room', sessionId);
       setConnected(true);
       joinedRef.current = false;
       joinRoom();
@@ -55,7 +55,7 @@ export const useMessages = (sessionId: string) => {
     socket.on('connect', onConnect);
 
     const onDisconnect = () => {
-      console.log('[WS] Disconnected');
+      if (import.meta.env.DEV) console.log('[WS] Disconnected');
       setConnected(false);
     };
     socket.on('disconnect', onDisconnect);
@@ -66,7 +66,7 @@ export const useMessages = (sessionId: string) => {
 
     // Listen for incoming messages (dedup guard by id)
     const onNewMessage = (msg: MessageOut) => {
-      console.log('[WS] >>> new_message received:', msg.id);
+      if (import.meta.env.DEV) console.log('[WS] >>> new_message received:', msg.id);
       setMessages((prev) => {
         // Remove any optimistic placeholder with matching content + sender
         const withoutOptimistic = prev.filter(
@@ -81,7 +81,7 @@ export const useMessages = (sessionId: string) => {
 
     // Listen for translation updates (phase 2 of two-phase broadcast)
     const onMessageUpdated = (update: { id: string; translated_content: string }) => {
-      console.log('[WS] >>> message_updated:', update.id);
+      if (import.meta.env.DEV) console.log('[WS] >>> message_updated:', update.id);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === update.id
@@ -94,7 +94,7 @@ export const useMessages = (sessionId: string) => {
 
     // C) Cleanup: remove listeners & leave room on unmount / sessionId change
     return () => {
-      console.log('[WS] Cleanup for session', sessionId, '| connected:', socket.connected);
+      if (import.meta.env.DEV) console.log('[WS] Cleanup for session', sessionId, '| connected:', socket.connected);
       if (socket.connected) {
         socket.emit('leave_room', { session_id: sessionId });
       }
@@ -130,7 +130,7 @@ export const useMessages = (sessionId: string) => {
       // Send via REST API (always reliable, no socket dependency)
       try {
         await sendMessageRest(sessionId, trimmed, senderLanguage);
-        console.log('[REST] Message sent successfully');
+        if (import.meta.env.DEV) console.log('[REST] Message sent successfully');
         // The server broadcasts via Socket.IO — our onNewMessage handler
         // will replace the optimistic message with the real one.
       } catch (error) {
