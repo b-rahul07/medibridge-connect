@@ -2,9 +2,9 @@
 MediBridge Connect — FastAPI application entry-point.
 
 Run with:
-    uvicorn app.main:combined_app --reload --host 0.0.0.0 --port 8000
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-The module exposes ``combined_app`` — a Socket.IO ASGI app that wraps
+The module exposes ``app`` — a Socket.IO ASGI app that wraps
 the FastAPI instance and serves both REST and real-time endpoints.
 """
 
