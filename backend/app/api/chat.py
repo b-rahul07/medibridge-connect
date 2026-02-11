@@ -53,10 +53,23 @@ def get_messages(
     if session.patient_id != current_user.id and session.doctor_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not a participant")
 
+    # Build query with cursor-based pagination
+    query = db.query(Message).filter(Message.session_id == session_id)
+    
+    if cursor:
+        # Cursor is the message ID from the previous page
+        try:
+            cursor_msg = db.query(Message).filter(Message.id == uuid.UUID(cursor)).first()
+            if cursor_msg:
+                # Get messages after this cursor's timestamp
+                query = query.filter(Message.created_at > cursor_msg.created_at)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid cursor format")
+    
     messages = (
-        db.query(Message)
-        .filter(Message.session_id == session_id)
+        query
         .order_by(Message.created_at.asc())
+        .limit(limit)
         .all()
     )
     return [MessageOut.model_validate(m) for m in messages]
@@ -256,14 +269,46 @@ async def upload_audio(
         sender_language = session.doctor_language or "en"
 
     # save file
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     ext = file.filename.split(".")[-1] if file.filename else "webm"
     filename = f"{uuid.uuid4()}.{ext}"
-    filepath = os.path.join(settings.UPLOAD_DIR, filename)
-
+    
     content = await file.read()
-    with open(filepath, "wb") as f:
-        f.write(content)
+    
+    # Upload to Cloudinary if configured, otherwise use local storage
+    if settings.USE_CLOUDINARY and settings.CLOUDINARY_CLOUD_NAME:
+        import cloudinary
+        import cloudinary.uploader
+        
+        # Configure Cloudinary
+        cloudinary.config(
+            cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+            api_key=settings.CLOUDINARY_API_KEY,
+            api_secret=settings.CLOUDINARY_API_SECRET,
+        )
+        
+        # Upload to Cloudinary
+        upload_result = cloudinary.uploader.upload(
+            content,
+            resource_type="raw",
+            folder="medibridge-audio",
+            public_id=filename.rsplit(".", 1)[0],
+        )
+        audio_url = upload_result["secure_url"]
+        logger.info("Audio uploaded to Cloudinary: %s", audio_url)
+        
+        # Save to temp file for transcription
+        filepath = os.path.join(settings.UPLOAD_DIR, filename)
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        with open(filepath, "wb") as f:
+            f.write(content)
+    else:
+        # Local storage fallback
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        filepath = os.path.join(settings.UPLOAD_DIR, filename)
+        with open(filepath, "wb") as f:
+            f.write(content)
+        audio_url = f"/uploads/{filename}"
+        logger.info("Audio saved locally: %s", filepath)
 
     # transcribe
     transcript = await transcribe_audio(filepath)
@@ -281,11 +326,18 @@ async def upload_audio(
         sender_id=current_user.id,
         content=transcript,
         translated_content=translated,
-        audio_url=f"/uploads/{filename}",
+        audio_url=audio_url,
     )
     db.add(message)
     db.commit()
     db.refresh(message)
+    
+    # Clean up temp file if using Cloudinary
+    if settings.USE_CLOUDINARY and settings.CLOUDINARY_CLOUD_NAME:
+        try:
+            os.remove(filepath)
+        except Exception:
+            logger.warning("Failed to remove temp audio file: %s", filepath)
 
     # Broadcast the audio message via Socket.IO so the other participant
     # sees it in real-time (without needing a page refresh).

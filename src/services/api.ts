@@ -65,6 +65,8 @@ export interface TokenResponse {
   user: UserOut;
 }
 
+// Note: TokenResponse kept for backwards compatibility but tokens now in httpOnly cookies
+
 export interface SessionOut {
   id: string;
   patient_id: string;
@@ -95,25 +97,21 @@ export async function signup(
   password: string,
   full_name: string,
   role: 'doctor' | 'patient',
-): Promise<TokenResponse> {
-  const data = await request<TokenResponse>('/auth/signup', {
+): Promise<UserOut> {
+  return request<UserOut>('/auth/signup', {
     method: 'POST',
     body: JSON.stringify({ email, password, full_name, role }),
   });
-  setToken(data.access_token);
-  return data;
 }
 
 export async function login(
   email: string,
   password: string,
-): Promise<TokenResponse> {
-  const data = await request<TokenResponse>('/auth/login', {
+): Promise<UserOut> {
+  return request<UserOut>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
-  setToken(data.access_token);
-  return data;
 }
 
 export async function getMe(): Promise<UserOut> {
@@ -121,7 +119,11 @@ export async function getMe(): Promise<UserOut> {
 }
 
 export function signOut(): void {
-  clearToken();
+  // Call logout endpoint to clear httpOnly cookie
+  fetch(`${API_BASE}/auth/logout`, {
+    method: 'POST',
+    credentials: 'include',
+  }).catch(() => {/* ignore errors */});
 }
 
 // ── consultations ─────────────────────────────────────────────────────

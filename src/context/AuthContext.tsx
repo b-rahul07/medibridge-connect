@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { getMe, getToken, signOut as apiSignOut, disconnectSocket, UserOut } from '@/services/api';
+import { getMe, signOut as apiSignOut, disconnectSocket, UserOut } from '@/services/api';
 
 interface AuthContextType {
   user: UserOut | null;
@@ -15,18 +15,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const refreshUser = async () => {
-    const token = getToken();
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
     try {
       const me = await getMe();
       setUser(me);
     } catch {
       setUser(null);
-      apiSignOut();
     } finally {
       setLoading(false);
     }

@@ -13,7 +13,7 @@ import uuid
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session as DBSession
 
@@ -70,13 +70,46 @@ def decode_token(token: str) -> dict:
         )
 
 
-# ── FastAPI dependency ────────────────────────────────────────────────
+def set_auth_cookie(response: Response, token: str) -> None:
+    """Set the JWT token in an httpOnly cookie.
+    
+    Args:
+        response: FastAPI Response object to set the cookie on.
+        token: JWT token to store.
+    """
+    response.set_cookie(
+        key="auth_token",
+        value=token,
+        httponly=True,  # Prevents JavaScript access (XSS protection)
+        samesite="lax",  # CSRF protection
+        secure=False,  # Set to True in production with HTTPS
+        max_age=settings.JWT_EXPIRATION_MINUTES * 60,  # Convert minutes to seconds
+        path="/",
+    )
+
+
+# ── FastAPI dependency ────────────────────────────────────
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
     db: DBSession = Depends(get_db),
 ) -> User:
-    """Dependency that extracts + validates the JWT and returns the User row."""
-    payload = decode_token(credentials.credentials)
+    """Dependency that extracts JWT from httpOnly cookie and returns the User row."""
+    # Try to get token from httpOnly cookie first
+    token = request.cookies.get("auth_token")
+    
+    # Fallback to Authorization header for backwards compatibility (Socket.IO, mobile)
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    
+    payload = decode_token(token)
     user_id = payload.get("sub")
     if user_id is None:
         raise HTTPException(status_code=401, detail="Invalid token payload")

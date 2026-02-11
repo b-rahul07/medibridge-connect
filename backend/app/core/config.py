@@ -47,6 +47,12 @@ class Settings:
 
     # ── Uploads ────────────────────────────────────────────────────────
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "uploads")
+    
+    # ── Cloudinary (Cloud Storage) ─────────────────────────────────────
+    CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+    CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY", "")
+    CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET", "")
+    USE_CLOUDINARY: bool = os.getenv("USE_CLOUDINARY", "false").lower() == "true"
 
 
 settings = Settings()
