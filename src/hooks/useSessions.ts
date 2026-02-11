@@ -51,12 +51,12 @@ export const useSessions = () => {
     };
   }, [fetchSessions]);
 
-  const createSession = useCallback(async () => {
+  const createSession = useCallback(async (patientLanguage?: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      const data = await requestConsultation();
+      const data = await requestConsultation(patientLanguage);
       return data;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to create session';
@@ -71,13 +71,14 @@ export const useSessions = () => {
   const acceptSession = useCallback(async (
     sessionId: string,
     _doctorId?: string,
-    navigate?: (path: string) => void
+    navigate?: (path: string) => void,
+    doctorLanguage?: string
   ) => {
     setLoading(true);
     setError(null);
 
     try {
-      const data = await acceptConsultation(sessionId);
+      const data = await acceptConsultation(sessionId, doctorLanguage);
 
       if (navigate) {
         navigate(`/session/${sessionId}`);

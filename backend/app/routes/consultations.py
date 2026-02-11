@@ -29,6 +29,21 @@ def request_consultation(
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Prevent duplicate: patient can only have one waiting or active session
+    existing = (
+        db.query(ConsultationSession)
+        .filter(
+            ConsultationSession.patient_id == current_user.id,
+            ConsultationSession.status.in_(["waiting", "active"]),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="You already have an open consultation. Please wait for it to complete before creating a new one.",
+        )
+
     session = ConsultationSession(
         patient_id=current_user.id,
         patient_language=body.patient_language,
@@ -133,6 +148,22 @@ def get_session(
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    session = (
+        db.query(ConsultationSession)
+        .filter(ConsultationSession.id == session_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    # Patients can only see their own sessions;
+    # Doctors can see their own + unclaimed waiting sessions they might accept.
+    if current_user.role == "patient" and session.patient_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not a participant of this session")
+    if current_user.role == "doctor":
+        is_participant = session.doctor_id == current_user.id
+        is_unclaimed = session.status == "waiting" and session.doctor_id is None
+        if not is_participant and not is_unclaimed:
+            raise HTTPException(status_code=403, detail="Not a participant of this session")
     return _load_session(db, session_id)
 
 

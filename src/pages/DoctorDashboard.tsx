@@ -68,11 +68,21 @@ const DoctorDashboard = () => {
   const handleCreateSession = async () => {
     if (!profile) return;
     
+    // Check if patient already has a waiting/active session
+    const hasOpenSession = sessions.some(s => s.status === 'waiting' || s.status === 'active');
+    if (hasOpenSession) {
+      alert('You already have an open consultation. Please wait for it to complete.');
+      return;
+    }
+    
     try {
-      await createSession();
+      await createSession(localStorage.getItem('medibridge_myLanguage') || 'en');
       await fetchSessions();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create session:', error);
+      if (error.message?.includes('already have')) {
+        alert(error.message);
+      }
     }
   };
 
@@ -81,7 +91,12 @@ const DoctorDashboard = () => {
     if (!profile) return;
     
     try {
-      await acceptSession(sessionId, profile.id, navigate);
+      await acceptSession(
+        sessionId,
+        profile.id,
+        navigate,
+        localStorage.getItem('medibridge_myLanguage') || 'en'
+      );
       await fetchSessions();
     } catch (error) {
       console.error('Failed to accept session:', error);
@@ -263,15 +278,21 @@ const DoctorDashboard = () => {
               {/* Create Session Button */}
               <Card>
                 <CardContent className="pt-6">
-                  <Button 
-                    onClick={handleCreateSession}
-                    disabled={loadingSessions}
-                    className="w-full h-16 text-lg gap-3"
-                    size="lg"
-                  >
-                    <Plus className="w-6 h-6" />
-                    {loadingSessions ? 'Creating...' : 'Request New Consultation'}
-                  </Button>
+                  {sessions.some(s => s.status === 'waiting' || s.status === 'active') ? (
+                    <p className="text-center text-sm text-muted-foreground py-4">
+                      You already have an open consultation. Complete or wait for it before requesting a new one.
+                    </p>
+                  ) : (
+                    <Button 
+                      onClick={handleCreateSession}
+                      disabled={loadingSessions}
+                      className="w-full h-16 text-lg gap-3"
+                      size="lg"
+                    >
+                      <Plus className="w-6 h-6" />
+                      {loadingSessions ? 'Creating...' : 'Request New Consultation'}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
 
@@ -298,13 +319,18 @@ const DoctorDashboard = () => {
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between">
                             <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">
+                              {session.doctor && (
+                                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                  <Stethoscope className="w-3.5 h-3.5 text-primary" />
+                                  Dr. {session.doctor.full_name}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Clock className="w-4 h-4" />
+                                <span className="text-sm">
                                   {new Date(session.created_at).toLocaleString()}
                                 </span>
                               </div>
-                              <p className="text-sm font-medium">Session ID: {session.id.slice(0, 8)}...</p>
                             </div>
                             <Badge 
                               variant={session.status === 'waiting' ? 'secondary' : session.status === 'active' ? 'default' : 'outline'}
@@ -353,7 +379,9 @@ const DoctorDashboard = () => {
                         <CardHeader>
                           <CardTitle className="text-base flex items-center gap-2">
                             <FileCheck className="w-4 h-4 text-blue-500" />
-                            Completed Session
+                            {session.doctor
+                              ? `Dr. ${session.doctor.full_name}`
+                              : 'Completed Session'}
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -362,7 +390,6 @@ const DoctorDashboard = () => {
                               <Clock className="w-4 h-4" />
                               {new Date(session.created_at).toLocaleString()}
                             </div>
-                            <p className="font-mono text-xs">ID: {session.id.slice(0, 12)}...</p>
                           </div>
                           {session.summary && (
                             <div className="border-t pt-4">
@@ -408,7 +435,7 @@ const DoctorDashboard = () => {
                         <CardHeader>
                           <CardTitle className="text-base flex items-center gap-2">
                             <User className="w-4 h-4" />
-                            Patient Request
+                            {session.patient?.full_name || 'Patient'}
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -417,7 +444,11 @@ const DoctorDashboard = () => {
                               <Clock className="w-4 h-4" />
                               {new Date(session.created_at).toLocaleString()}
                             </div>
-                            <p className="font-mono text-xs">ID: {session.id.slice(0, 12)}...</p>
+                            {session.patient_language && (
+                              <p className="text-xs text-muted-foreground">
+                                Language: {session.patient_language}
+                              </p>
+                            )}
                           </div>
                           <Button 
                             onClick={() => handleAcceptSession(session.id)}
@@ -454,7 +485,7 @@ const DoctorDashboard = () => {
                         <CardHeader>
                           <CardTitle className="text-base flex items-center gap-2">
                             <CheckCircle className="w-4 h-4 text-green-500" />
-                            Active Session
+                            {session.patient?.full_name || 'Patient'}
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -463,7 +494,6 @@ const DoctorDashboard = () => {
                               <Clock className="w-4 h-4" />
                               {new Date(session.created_at).toLocaleString()}
                             </div>
-                            <p className="font-mono text-xs">ID: {session.id.slice(0, 12)}...</p>
                           </div>
                           <Button 
                             variant="outline"
@@ -500,7 +530,7 @@ const DoctorDashboard = () => {
                         <CardHeader>
                           <CardTitle className="text-base flex items-center gap-2">
                             <FileCheck className="w-4 h-4 text-blue-500" />
-                            Completed Session
+                            {session.patient?.full_name || 'Patient'}
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -509,7 +539,6 @@ const DoctorDashboard = () => {
                               <Clock className="w-4 h-4" />
                               {new Date(session.created_at).toLocaleString()}
                             </div>
-                            <p className="font-mono text-xs">ID: {session.id.slice(0, 12)}...</p>
                           </div>
                           {session.summary && (
                             <div className="border-t pt-4">

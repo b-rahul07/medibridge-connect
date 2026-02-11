@@ -10,7 +10,7 @@ import { useMessages } from '@/hooks/useMessages';
 import { useSessions } from '@/hooks/useSessions';
 import { SUPPORTED_LANGUAGES } from '@/lib/translator';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { translateText as apiTranslate, summarizeSession, uploadAudio, API_BASE } from '@/lib/api';
+import { translateText as apiTranslate, summarizeSession, uploadAudio, API_BASE, getSession, SessionOut } from '@/lib/api';
 
 const SessionChat = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -18,6 +18,7 @@ const SessionChat = () => {
   const navigate = useNavigate();
   const { messages, loading, sendMessage } = useMessages(sessionId!);
   const { sessions, endSession } = useSessions();
+  const [sessionDetail, setSessionDetail] = useState<SessionOut | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [myLanguage, setMyLanguage] = useState(() => {
     return localStorage.getItem('medibridge_myLanguage') || 'en';
@@ -53,7 +54,26 @@ const SessionChat = () => {
   
   // Derive role from auth user (no Supabase profile fetch)
   const profile = user ? { role: user.role } : null;
-  
+
+  // Fetch session details to show the other party's name
+  useEffect(() => {
+    if (!sessionId) return;
+    getSession(sessionId)
+      .then(setSessionDetail)
+      .catch((err) => console.error('Failed to load session detail:', err));
+  }, [sessionId]);
+
+  // Derive the other party's name
+  const otherPartyName = (() => {
+    if (!sessionDetail || !user) return null;
+    if (user.role === 'doctor') {
+      return sessionDetail.patient?.full_name || 'Patient';
+    }
+    return sessionDetail.doctor
+      ? `Dr. ${sessionDetail.doctor.full_name}`
+      : null;
+  })();
+
   // Audio recording
   const { startRecording, stopRecording, isRecording, audioBlob, clearRecording } = useAudioRecorder();
 
@@ -186,8 +206,10 @@ const SessionChat = () => {
             </Select>
           </div>
           
-          <h1 className="text-xs sm:text-sm font-medium text-muted-foreground hidden md:block">
-            Session: {sessionId?.slice(0, 8)}...
+          <h1 className="text-xs sm:text-sm font-medium text-foreground hidden md:block">
+            {otherPartyName
+              ? `Chat with ${otherPartyName}`
+              : `Session: ${sessionId?.slice(0, 8)}...`}
           </h1>
 
           {/* End Consultation Button (Doctors only) */}
