@@ -576,8 +576,3 @@ const DoctorDashboard = () => {
 };
 
 export default DoctorDashboard;
-    </div>
-  );
-};
-
-export default DoctorDashboard;

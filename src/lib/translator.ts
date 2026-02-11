@@ -21,7 +21,7 @@ export const translateText = async (
   text: string,
   targetLang: string
 ): Promise<string> => {
-  console.log("Translating via backend:", text, "→", targetLang);
+  if (import.meta.env.DEV) console.log("Translating via backend:", text, "→", targetLang);
   try {
     return await apiTranslate(text, targetLang);
   } catch (error: any) {

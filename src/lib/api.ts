@@ -165,12 +165,6 @@ export async function getSession(sessionId: string): Promise<SessionOut> {
   return request<SessionOut>(`/consultations/${sessionId}`);
 }
 
-export async function searchMessages(query: string): Promise<SessionOut[]> {
-  return request<SessionOut[]>(
-    `/consultations/search/messages?q=${encodeURIComponent(query)}`,
-  );
-}
-
 export async function searchMessagesDetail(query: string): Promise<MessageOut[]> {
   return request<MessageOut[]>(
     `/consultations/search/messages/detail?q=${encodeURIComponent(query)}`,
@@ -262,19 +256,22 @@ export function getSocket(): Socket {
       reconnectionDelayMax: 5000,
     });
 
-    _socket.on('connect', () => console.log('[WS] Socket connected, id:', _socket?.id));
+    _socket.on('connect', () => {
+      if (import.meta.env.DEV) console.log('[WS] Socket connected, id:', _socket?.id);
+    });
     _socket.on('connect_error', (err) => console.error('[WS] Connect error:', err.message));
     _socket.on('disconnect', (reason) => {
-      console.log('[WS] Socket disconnected:', reason);
+      if (import.meta.env.DEV) console.log('[WS] Socket disconnected:', reason);
       if (_socket) {
         _socket.auth = { token: getToken() };
       }
     });
 
-    // Debug: log every event the server sends
-    _socket.onAny((event, ...args) => {
-      console.log(`[WS] ⇦ event "${event}"`, args.length ? args[0] : '');
-    });
+    if (import.meta.env.DEV) {
+      _socket.onAny((event, ...args) => {
+        console.log(`[WS] ⇦ event "${event}"`, args.length ? args[0] : '');
+      });
+    }
   }
   return _socket;
 }

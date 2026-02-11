@@ -53,7 +53,7 @@ const LandingPage = () => {
 
               <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-md">
                 A real-time, AI-powered consultation bridge for doctors and patients.
-                Providing instant, medically-accurate translation across 100+ languages.
+                Providing instant, medically-accurate translation across multiple languages.
               </p>
 
               <div className="flex flex-wrap gap-4">
