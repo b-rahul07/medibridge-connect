@@ -86,8 +86,8 @@ class XSSProtectionMiddleware(BaseHTTPMiddleware):
         if request.method in ("POST", "PUT", "PATCH"):
             content_type = request.headers.get("content-type", "")
             if "application/json" in content_type:
-                body = await request.body()
-                if _XSS_PATTERN.search(body.decode("utf-8", errors="ignore")):
+                body_bytes = await request.body()
+                if _XSS_PATTERN.search(body_bytes.decode("utf-8", errors="ignore")):
                     logger.warning(
                         "XSS attempt blocked from %s on %s",
                         request.client.host if request.client else "unknown",
@@ -97,6 +97,10 @@ class XSSProtectionMiddleware(BaseHTTPMiddleware):
                         status_code=400,
                         content={"detail": "Request rejected: potentially unsafe content detected."},
                     )
+                # Re-inject the body so downstream handlers can read it
+                async def _receive():
+                    return {"type": "http.request", "body": body_bytes}
+                request._receive = _receive
         return await call_next(request)
 
 
