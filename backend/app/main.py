@@ -10,15 +10,22 @@ the FastAPI instance and serves both REST and real-time endpoints.
 
 import logging
 import os
+import re
+import time
 
 import socketio
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
 from app.sockets import sio
+
+# ── server start timestamp (for uptime calculation) ───────────────────
+_SERVER_START_TIME = time.time()
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +48,61 @@ api = FastAPI(
     version="1.0.0",
     description="Healthcare translation consultation backend",
 )
+
+
+# ── Security Headers Middleware ───────────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Inject hardening headers into every response."""
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "connect-src 'self' ws: wss:; "
+            "frame-ancestors 'none';"
+        )
+        return response
+
+
+# ── XSS Protection Middleware ─────────────────────────────────────────
+_XSS_PATTERN = re.compile(
+    r"<\s*script|javascript\s*:|on\w+\s*=",
+    re.IGNORECASE,
+)
+
+
+class XSSProtectionMiddleware(BaseHTTPMiddleware):
+    """Reject requests whose JSON body contains script-injection patterns."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method in ("POST", "PUT", "PATCH"):
+            content_type = request.headers.get("content-type", "")
+            if "application/json" in content_type:
+                body = await request.body()
+                if _XSS_PATTERN.search(body.decode("utf-8", errors="ignore")):
+                    logger.warning(
+                        "XSS attempt blocked from %s on %s",
+                        request.client.host if request.client else "unknown",
+                        request.url.path,
+                    )
+                    return JSONResponse(
+                        status_code=400,
+                        content={"detail": "Request rejected: potentially unsafe content detected."},
+                    )
+        return await call_next(request)
+
+
+# Register middleware (order matters — outermost runs first)
+api.add_middleware(SecurityHeadersMiddleware)
+api.add_middleware(XSSProtectionMiddleware)
 
 # CORS
 api.add_middleware(
@@ -65,10 +127,41 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 api.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 
-# ── health check ──────────────────────────────────────────────────────
+# ── system health check ───────────────────────────────────────────────
+from sqlalchemy import text as sa_text
+
+
 @api.get("/health")
 def health():
-    return {"status": "ok"}
+    """Comprehensive health check: database, AI service, and uptime."""
+    db_status = "connected"
+    ai_status = "available"
+    overall = "healthy"
+
+    # ── Database probe ────────────────────────────────────────────
+    try:
+        db = SessionLocal()
+        db.execute(sa_text("SELECT 1"))
+        db.close()
+    except Exception as exc:
+        logger.error("Health-check DB probe failed: %s", exc)
+        db_status = "error"
+        overall = "degraded"
+
+    # ── AI service probe (key configured?) ────────────────────────
+    if not settings.GITHUB_TOKEN:
+        ai_status = "unavailable"
+        overall = "degraded"
+
+    # ── Uptime ────────────────────────────────────────────────────
+    uptime_seconds = round(time.time() - _SERVER_START_TIME, 1)
+
+    return {
+        "status": overall,
+        "database": db_status,
+        "ai_service": ai_status,
+        "uptime_seconds": uptime_seconds,
+    }
 
 
 # ── AI endpoints (translate + summarize) ──────────────────────────────

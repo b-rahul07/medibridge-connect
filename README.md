@@ -18,7 +18,7 @@ Built as a full-stack proof of concept for the Healthcare Translation Challenge.
 - [Available Scripts](#available-scripts)
 - [Project Structure](#project-structure)
 - [Design Decisions](#design-decisions)
-- [Known Limitations & Future Work](#known-limitations--future-work)
+- [Technical Limitations & Trade-offs](#technical-limitations--trade-offs)
 - [License](#license)
 
 ---
@@ -165,7 +165,7 @@ cp .env.example .env
 psql -U postgres -d medibridge -f schema.sql
 
 # Start the backend server
-uvicorn app.main:combined_app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # → API available at http://localhost:8000
 # → Health check: http://localhost:8000/health
 ```
@@ -259,7 +259,7 @@ The app expects a PostgreSQL database named `medibridge`. Run `backend/schema.sq
 
 | Command | Description |
 |---------|-------------|
-| `uvicorn app.main:combined_app --reload` | Start FastAPI dev server with hot reload |
+| `uvicorn app.main:app --reload` | Start FastAPI dev server with hot reload |
 | `python -m pytest` | Run backend tests (if added) |
 
 ---
@@ -334,16 +334,20 @@ The app expects a PostgreSQL database named `medibridge`. Run `backend/schema.sq
 
 ---
 
-## Known Limitations & Future Work
+## Technical Limitations & Trade-offs
 
-| Limitation | Detail | Future Improvement |
-|-----------|--------|-------------------|
-| **Single target language** | Each message is translated to one language. | Fan-out translation pipeline for multi-party sessions. |
-| **Keyword search only** | `ILIKE` matching. | PostgreSQL full-text search (`tsvector`) or vector/semantic search. |
-| **No streaming translation** | Translation arrives as a single update. | Use OpenAI streaming API to show translation token-by-token. |
-| **No message pagination** | All messages loaded at once. | Cursor-based pagination for long conversations. |
-| **No email verification** | Sign-up is immediate for demo convenience. | Email confirmation flow. |
-| **No rate limiting** | AI endpoints are unprotected. | Add FastAPI rate limiting middleware. |
+| # | Limitation | Impact | Production Path |
+|---|-----------|--------|----------------|
+| 1 | **Local File Storage** | Audio files are stored in a local `/uploads` directory. Ephemeral filesystems on Render/Vercel are wiped on every restart. | Migration to **AWS S3** or **Google Cloud Storage** with signed URLs. |
+| 2 | **Keyword vs. Semantic Search** | Current search uses PostgreSQL `ILIKE` (keyword matching). Searching for "heart pain" won't find "cardiac arrest". | Implementation of **pgvector** for RAG-based semantic search. |
+| 3 | **Stateless WebSockets** | Socket.IO uses an in-memory manager. If the server scales to multiple instances, users on different servers won't see each other's messages. | Integration of a **Redis adapter** for Socket.IO. |
+| 4 | **HIPAA Compliance** | Data is encrypted in transit (TLS) and at rest (PostgreSQL), but this prototype is **not fully HIPAA compliant**. It lacks audit logging, strict BAA-compliant hosting, and granular access control. | Audit logging, BAA-certified hosting (e.g., Azure Health), field-level encryption. |
+| 5 | **Single target language** | Each message is translated to one language only. | Fan-out translation pipeline for multi-party sessions. |
+| 6 | **No streaming translation** | Translation arrives as a single update. | Use OpenAI streaming API to show translation token-by-token. |
+| 7 | **No message pagination** | All messages loaded at once. | Cursor-based pagination for long conversations. |
+| 8 | **No email verification** | Sign-up is immediate for demo convenience. | Email confirmation flow with token-based verification. |
+| 9 | **No rate limiting** | AI endpoints are unprotected against abuse. | Add FastAPI rate-limiting middleware (e.g., `slowapi`). |
+| 10 | **JWT in localStorage** | Vulnerable to XSS (mitigated by security headers & XSS middleware, but not eliminated). | `httpOnly` cookies with CSRF protection. |
 
 ---
 
