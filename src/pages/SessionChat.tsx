@@ -360,13 +360,20 @@ const SessionChat = () => {
                       }`}
                     >
                       {message.translated_content ? (
-                        <p className={`text-[14px] italic leading-relaxed ${
-                          isDoctor
-                            ? 'text-indigo-500 dark:text-indigo-400'
-                            : 'text-emerald-600 dark:text-emerald-400'
-                        }`}>
-                          {message.translated_content}
-                        </p>
+                        // Only show translation if it's different from original content
+                        message.translated_content !== message.content ? (
+                          <p className={`text-[14px] italic leading-relaxed ${
+                            isDoctor
+                              ? 'text-indigo-500 dark:text-indigo-400'
+                              : 'text-emerald-600 dark:text-emerald-400'
+                          }`}>
+                            {message.translated_content}
+                          </p>
+                        ) : (
+                          <p className="text-xs italic text-muted-foreground/50">
+                            No translation needed
+                          </p>
+                        )
                       ) : (
                         <div className={`flex items-center gap-1.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/60" />

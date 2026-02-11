@@ -155,6 +155,7 @@ async def send_message(sid, data):
 
     # ── Determine target language from the OTHER participant's language ──
     target_language = "en"  # fallback
+    actual_sender_language = "en"  # track sender's actual language
     db = _get_db()
     try:
         consultation = (
@@ -167,16 +168,19 @@ async def send_message(sid, data):
             if is_patient:
                 # Patient is sending → translate into doctor's language
                 target_language = consultation.doctor_language or "en"
-                # Also persist/update the patient's language if provided
+                # Update patient's language if provided
                 if sender_language and consultation.patient_language != sender_language:
                     consultation.patient_language = sender_language
                     db.commit()
+                actual_sender_language = consultation.patient_language or "en"
             else:
                 # Doctor is sending → translate into patient's language
                 target_language = consultation.patient_language or "en"
+                # Update doctor's language if provided
                 if sender_language and consultation.doctor_language != sender_language:
                     consultation.doctor_language = sender_language
                     db.commit()
+                actual_sender_language = consultation.doctor_language or "en"
     except Exception:
         logger.exception("Failed to resolve target language from session")
     finally:
@@ -213,11 +217,16 @@ async def send_message(sid, data):
         logger.info("Phase 1 done — instant broadcast for %s", msg_id)
 
         # ── Phase 2: translate, save to DB, push update ─────────────
-        try:
-            translated = await translate_text(content, target_language)
-        except Exception:
-            logger.exception("AI translation failed for %s — using fallback", msg_id)
-            translated = "[Translation temporarily unavailable]"
+        # Skip translation if sender and target languages are the same
+        if actual_sender_language.lower() == target_language.lower():
+            logger.info("Skipping translation — sender and target language both '%s'", target_language)
+            translated = content  # Use original content when languages match
+        else:
+            try:
+                translated = await translate_text(content, target_language)
+            except Exception:
+                logger.exception("AI translation failed for %s — using fallback", msg_id)
+                translated = "[Translation temporarily unavailable]"
 
         db = _get_db()
         try:

@@ -146,10 +146,12 @@ async def send_message_rest(
         target_language = session.doctor_language or "en"
         if body.sender_language and session.patient_language != body.sender_language:
             session.patient_language = body.sender_language
+        actual_sender_language = session.patient_language or "en"
     else:
         target_language = session.patient_language or "en"
         if body.sender_language and session.doctor_language != body.sender_language:
             session.doctor_language = body.sender_language
+        actual_sender_language = session.doctor_language or "en"
 
     # ── Persist the message ──────────────────────────────────────
     message = Message(
@@ -179,9 +181,23 @@ async def send_message_rest(
     logger.info("REST send — Phase 1 broadcast for %s", msg_id)
 
     # ── Phase 2: translate in background ─────────────────────────
-    asyncio.create_task(
-        _translate_and_broadcast(msg_id, body.content, target_language, room)
-    )
+    # Skip translation if sender and target languages are the same
+    if actual_sender_language.lower() == target_language.lower():
+        logger.info("REST send — skipping translation, both languages are '%s'", target_language)
+        # Update with original content immediately
+        db_session = SessionLocal()
+        try:
+            row = db_session.query(Message).filter(Message.id == uuid.UUID(msg_id)).first()
+            if row:
+                row.translated_content = body.content
+                db_session.commit()
+        finally:
+            db_session.close()
+        await sio.emit("message_updated", {"id": msg_id, "translated_content": body.content}, room=room)
+    else:
+        asyncio.create_task(
+            _translate_and_broadcast(msg_id, body.content, target_language, room)
+        )
 
     return MessageOut.model_validate(message)
 
@@ -230,6 +246,15 @@ async def upload_audio(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # Determine sender and target languages
+    is_patient = session.patient_id == current_user.id
+    if is_patient:
+        actual_target_language = session.doctor_language or "en"
+        sender_language = session.patient_language or "en"
+    else:
+        actual_target_language = session.patient_language or "en"
+        sender_language = session.doctor_language or "en"
+
     # save file
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     ext = file.filename.split(".")[-1] if file.filename else "webm"
@@ -243,8 +268,12 @@ async def upload_audio(
     # transcribe
     transcript = await transcribe_audio(filepath)
 
-    # translate the transcript
-    translated = await translate_text(transcript, target_language)
+    # translate the transcript (skip if sender and target languages match)
+    if sender_language.lower() == actual_target_language.lower():
+        logger.info("Audio upload — skipping translation, both languages are '%s'", actual_target_language)
+        translated = transcript
+    else:
+        translated = await translate_text(transcript, actual_target_language)
 
     # persist message
     message = Message(
