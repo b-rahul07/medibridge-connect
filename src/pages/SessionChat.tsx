@@ -20,14 +20,14 @@ const SessionChat = () => {
   const [sessionDetail, setSessionDetail] = useState<SessionOut | null>(null);
   const [newMessage, setNewMessage] = useState('');
 
-  // Single preferred language — stored per user in localStorage
+  // Single preferred language — stored per tab in sessionStorage
   const [myLanguage, setMyLanguage] = useState(() => {
-    return localStorage.getItem('medibridge_myLanguage') || 'en';
+    return sessionStorage.getItem('medibridge_myLanguage') || 'en';
   });
 
   const handleMyLanguageChange = (lang: string) => {
     setMyLanguage(lang);
-    localStorage.setItem('medibridge_myLanguage', lang);
+    sessionStorage.setItem('medibridge_myLanguage', lang);
   };
   const [isSending, setIsSending] = useState(false);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);

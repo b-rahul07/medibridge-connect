@@ -7,15 +7,15 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // ── token helpers ─────────────────────────────────────────────────────
 export function getToken(): string | null {
-  return localStorage.getItem('auth_token');
+  return sessionStorage.getItem('auth_token');
 }
 
 export function setToken(token: string): void {
-  localStorage.setItem('auth_token', token);
+  sessionStorage.setItem('auth_token', token);
 }
 
 export function clearToken(): void {
-  localStorage.removeItem('auth_token');
+  sessionStorage.removeItem('auth_token');
 }
 
 // ── generic fetch wrapper ─────────────────────────────────────────────

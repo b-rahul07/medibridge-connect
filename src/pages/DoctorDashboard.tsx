@@ -73,7 +73,7 @@ const DoctorDashboard = () => {
     }
     
     try {
-      await createSession(localStorage.getItem('medibridge_myLanguage') || 'en');
+      await createSession(sessionStorage.getItem('medibridge_myLanguage') || 'en');
       await fetchSessions();
     } catch (error: any) {
       console.error('Failed to create session:', error);
@@ -92,7 +92,7 @@ const DoctorDashboard = () => {
         sessionId,
         profile.id,
         navigate,
-        localStorage.getItem('medibridge_myLanguage') || 'en'
+        sessionStorage.getItem('medibridge_myLanguage') || 'en'
       );
       await fetchSessions();
     } catch (error) {
