@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Send, Languages, Mic, Square, Loader2, FileCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,42 +9,25 @@ import { useMessages } from '@/hooks/useMessages';
 import { useSessions } from '@/hooks/useSessions';
 import { SUPPORTED_LANGUAGES } from '@/lib/translator';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { translateText as apiTranslate, summarizeSession, uploadAudio, API_BASE, getSession, SessionOut } from '@/lib/api';
+import { summarizeSession, uploadAudio, API_BASE, getSession, SessionOut } from '@/lib/api';
 
 const SessionChat = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { messages, loading, sendMessage } = useMessages(sessionId!);
-  const { sessions, endSession } = useSessions();
+  const { endSession } = useSessions();
   const [sessionDetail, setSessionDetail] = useState<SessionOut | null>(null);
   const [newMessage, setNewMessage] = useState('');
+
+  // Single preferred language — stored per user in localStorage
   const [myLanguage, setMyLanguage] = useState(() => {
     return localStorage.getItem('medibridge_myLanguage') || 'en';
   });
-  const [targetLanguage, setTargetLanguage] = useState(() => {
-    return localStorage.getItem('medibridge_targetLanguage') || 'es';
-  });
 
-  // If user sets myLanguage to same as targetLanguage, auto-swap
   const handleMyLanguageChange = (lang: string) => {
     setMyLanguage(lang);
     localStorage.setItem('medibridge_myLanguage', lang);
-    if (lang === targetLanguage) {
-      const swapped = myLanguage;
-      setTargetLanguage(swapped);
-      localStorage.setItem('medibridge_targetLanguage', swapped);
-    }
-  };
-
-  const handleTargetLanguageChange = (lang: string) => {
-    setTargetLanguage(lang);
-    localStorage.setItem('medibridge_targetLanguage', lang);
-    if (lang === myLanguage) {
-      const swapped = targetLanguage;
-      setMyLanguage(swapped);
-      localStorage.setItem('medibridge_myLanguage', swapped);
-    }
   };
   const [isSending, setIsSending] = useState(false);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
@@ -88,7 +70,7 @@ const SessionChat = () => {
 
     setIsUploadingAudio(true);
     try {
-      await uploadAudio(sessionId, audioBlob, targetLanguage);
+      await uploadAudio(sessionId, audioBlob, myLanguage);
       clearRecording();
     } catch (error) {
       console.error('Failed to upload audio:', error);
@@ -96,7 +78,7 @@ const SessionChat = () => {
     } finally {
       setIsUploadingAudio(false);
     }
-  }, [audioBlob, user, sessionId, clearRecording, isUploadingAudio, targetLanguage]);
+  }, [audioBlob, user, sessionId, clearRecording, isUploadingAudio, myLanguage]);
 
   // Auto-send audio when recording finishes — guard against duplicate uploads
   useEffect(() => {
@@ -122,14 +104,8 @@ const SessionChat = () => {
 
     setIsSending(true);
     try {
-      // Send message via Socket.IO; the backend translates and broadcasts
-      await sendMessage(
-        newMessage,
-        user.id,
-        undefined,
-        myLanguage,
-        targetLanguage
-      );
+      // Send message via Socket.IO; backend auto-detects target language
+      await sendMessage(newMessage, myLanguage);
       
       setNewMessage('');
     } catch (error) {
@@ -176,24 +152,12 @@ const SessionChat = () => {
         </Link>
         
         <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-end">
-          {/* Language Selectors: My Language → Target Language */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          {/* Single Language Selector: My Preferred Language */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <Languages className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <span className="text-xs text-muted-foreground hidden sm:inline">My Language:</span>
             <Select value={myLanguage} onValueChange={handleMyLanguageChange}>
-              <SelectTrigger className="w-[85px] sm:w-[120px] h-8 text-xs sm:text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <SelectItem key={lang.code} value={lang.code}>
-                    {lang.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="text-xs text-muted-foreground">→</span>
-            <Select value={targetLanguage} onValueChange={handleTargetLanguageChange}>
-              <SelectTrigger className="w-[85px] sm:w-[120px] h-8 text-xs sm:text-sm">
+              <SelectTrigger className="w-[100px] sm:w-[130px] h-8 text-xs sm:text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -261,13 +225,14 @@ const SessionChat = () => {
               return (
                 <div
                   key={message.id}
-                  className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                  className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                 >
-                  <Card
-                    className={`max-w-[75%] px-4 py-3 ${
+                  {/* Chat Bubble — contains ONLY the original text */}
+                  <div
+                    className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
                       isMe
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground'
+                        ? 'bg-primary text-primary-foreground rounded-br-md'
+                        : 'bg-muted text-foreground border border-border rounded-bl-md'
                     }`}
                   >
                     {/* Audio Message */}
@@ -281,57 +246,42 @@ const SessionChat = () => {
                         }}
                       />
                     ) : (
-                      <>
-                        {/* Original Message */}
-                        <p className="text-sm leading-relaxed break-words font-medium">
-                          {message.content}
-                        </p>
-                        
-                        {/* Translation (if available) or "Translating..." indicator */}
-                        {message.translated_content ? (
-                          <div className="mt-2 pt-2 border-t border-current/20">
-                            <div className="flex items-center gap-1 mb-1">
-                              <Languages className="w-3 h-3 opacity-70" />
-                              <span
-                                className={`text-[10px] uppercase font-semibold opacity-70`}
-                              >
-                                Translation
-                              </span>
-                            </div>
-                            <p
-                              className={`text-xs leading-relaxed break-words ${
-                                isMe ? 'text-primary-foreground/80' : 'text-muted-foreground'
-                              }`}
-                            >
-                              {message.translated_content}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="mt-2 pt-2 border-t border-current/20">
-                            <div className="flex items-center gap-1.5">
-                              <Loader2 className="w-3 h-3 animate-spin opacity-50" />
-                              <span
-                                className={`text-[10px] italic ${
-                                  isMe ? 'text-primary-foreground/50' : 'text-muted-foreground/60'
-                                }`}
-                              >
-                                Translating...
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </>
+                      <p className="text-sm leading-relaxed break-words">
+                        {message.content}
+                      </p>
                     )}
                     
                     {/* Timestamp */}
                     <p
-                      className={`text-xs mt-2 ${
-                        isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                      className={`text-[10px] mt-1 ${
+                        isMe ? 'text-primary-foreground/60' : 'text-muted-foreground'
                       }`}
                     >
-                      {new Date(message.created_at).toLocaleTimeString()}
+                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
-                  </Card>
+                  </div>
+
+                  {/* Translation — shown BELOW the bubble, prominent */}
+                  {!message.audio_url && (
+                    <div
+                      className={`max-w-[75%] mt-1 px-3 ${
+                        isMe ? 'text-right' : 'text-left'
+                      }`}
+                    >
+                      {message.translated_content ? (
+                        <p className="text-sm italic text-muted-foreground leading-relaxed">
+                          {message.translated_content}
+                        </p>
+                      ) : (
+                        <div className={`flex items-center gap-1.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                          <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" />
+                          <span className="text-xs italic text-muted-foreground/50">
+                            Translating...
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -364,7 +314,7 @@ const SessionChat = () => {
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder={`Type in ${SUPPORTED_LANGUAGES.find(l => l.code === myLanguage)?.name || 'your language'} → translates to ${SUPPORTED_LANGUAGES.find(l => l.code === targetLanguage)?.name || 'target'}...`}
+            placeholder={`Type in ${SUPPORTED_LANGUAGES.find(l => l.code === myLanguage)?.name || 'your language'}...`}
             className="flex-1"
             disabled={loading || isSending || isRecording || isUploadingAudio}
           />

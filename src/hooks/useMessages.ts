@@ -95,23 +95,16 @@ export const useMessages = (sessionId: string) => {
 
   // ── Send a message via Socket.IO ───────────────────────────────────
   const sendMessage = useCallback(
-    async (
-      content: string,
-      _senderId: string,
-      _translatedContent?: string,
-      _originalLang?: string,
-      targetLang?: string,
-      _isAudio: boolean = false
-    ) => {
+    async (content: string, senderLanguage?: string) => {
       if (!sessionId || !content.trim()) return;
 
       const socket = getSocket();
-      console.log('[WS] sendMessage — connected:', socket.connected, 'sessionId:', sessionId, 'targetLang:', targetLang);
+      console.log('[WS] sendMessage — connected:', socket.connected, 'sessionId:', sessionId);
       if (socket.connected) {
         socket.emit('send_message', {
           session_id: sessionId,
           content: content.trim(),
-          target_language: targetLang || 'en',
+          sender_language: senderLanguage,
         });
         console.log('[WS] send_message emitted');
       } else {

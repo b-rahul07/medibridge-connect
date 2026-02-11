@@ -146,12 +146,41 @@ async def send_message(sid, data):
 
     session_id = data.get("session_id")
     content = data.get("content", "")
-    target_language = data.get("target_language", "en")
+    sender_language = data.get("sender_language")        # NEW: "I speak this"
 
     if not session_id or not content:
         return
 
     room = f"session_{session_id}"
+
+    # ── Determine target language from the OTHER participant's language ──
+    target_language = "en"  # fallback
+    db = _get_db()
+    try:
+        consultation = (
+            db.query(ConsultationSession)
+            .filter(ConsultationSession.id == uuid.UUID(session_id))
+            .first()
+        )
+        if consultation:
+            is_patient = str(consultation.patient_id) == user_id
+            if is_patient:
+                # Patient is sending → translate into doctor's language
+                target_language = consultation.doctor_language or "en"
+                # Also persist/update the patient's language if provided
+                if sender_language and consultation.patient_language != sender_language:
+                    consultation.patient_language = sender_language
+                    db.commit()
+            else:
+                # Doctor is sending → translate into patient's language
+                target_language = consultation.patient_language or "en"
+                if sender_language and consultation.doctor_language != sender_language:
+                    consultation.doctor_language = sender_language
+                    db.commit()
+    except Exception:
+        logger.exception("Failed to resolve target language from session")
+    finally:
+        db.close()
 
     try:
         # ── Phase 1: persist original & broadcast instantly ─────────
