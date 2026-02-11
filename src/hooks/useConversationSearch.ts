@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { searchMessagesDetail, MessageOut } from '@/lib/api';
+import { searchMessagesDetail, MessageOut } from '@/services/api';
 
 interface SearchResult {
   id: string;

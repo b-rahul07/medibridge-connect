@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Send, Languages, Mic, Square, Loader2, FileCheck, Stethoscope, User, WifiOff } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
-import { SUPPORTED_LANGUAGES } from '@/lib/translator';
+import { SUPPORTED_LANGUAGES } from '@/services/translator';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { summarizeSession, uploadAudio, API_BASE, getSession, endConsultation, SessionOut } from '@/lib/api';
+import { summarizeSession, uploadAudio, API_BASE, getSession, endConsultation, SessionOut } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
 const SessionChat = () => {

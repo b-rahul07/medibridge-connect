@@ -13,15 +13,15 @@ from datetime import datetime, timezone
 import socketio
 from sqlalchemy.orm import Session as DBSession
 
-from app.database import SessionLocal
-from app.auth import decode_token
-from app.models import Message, Session as ConsultationSession
+from app.core.database import SessionLocal
+from app.core.security import decode_token
+from app.models.models import Message, Session as ConsultationSession
 from app.services.ai_service import translate_text
 
 logger = logging.getLogger(__name__)
 
 # ── create async Socket.IO server ─────────────────────────────────────
-from app.config import settings as _settings
+from app.core.config import settings as _settings
 
 sio = socketio.AsyncServer(
     async_mode="asgi",

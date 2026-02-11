@@ -5,7 +5,7 @@ import {
   acceptConsultation,
   endConsultation,
   SessionOut,
-} from '@/lib/api';
+} from '@/services/api';
 
 export type { SessionOut as Session };
 

@@ -8,8 +8,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session as DBSession, joinedload
 
-from app.database import get_db
-from app.models import User, Session as ConsultationSession, Message
+from app.core.database import get_db
+from app.models.models import User, Session as ConsultationSession, Message
 from app.schemas import (
     SessionCreateRequest,
     SessionAcceptRequest,
@@ -17,7 +17,7 @@ from app.schemas import (
     SessionOut,
     MessageOut,
 )
-from app.auth import get_current_user
+from app.core.security import get_current_user
 
 router = APIRouter(prefix="/consultations", tags=["consultations"])
 
@@ -212,7 +212,7 @@ def search_messages(
     current_user: User = Depends(get_current_user),
 ):
     from sqlalchemy import or_
-    from app.models import Message
+    from app.models.models import Message
 
     # find sessions where any message matches
     matching_session_ids = (

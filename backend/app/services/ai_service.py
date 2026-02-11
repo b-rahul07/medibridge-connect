@@ -8,7 +8,7 @@ the app can still be exercised without an API key.
 
 import logging
 from openai import AsyncOpenAI
-from app.config import settings
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 

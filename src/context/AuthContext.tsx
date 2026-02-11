@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { getMe, getToken, signOut as apiSignOut, disconnectSocket, UserOut } from '@/lib/api';
+import { getMe, getToken, signOut as apiSignOut, disconnectSocket, UserOut } from '@/services/api';
 
 interface AuthContextType {
   user: UserOut | null;

@@ -19,9 +19,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
-from app.database import engine, Base, SessionLocal
-from app.sockets import sio
+from app.core.config import settings
+from app.core.database import engine, Base, SessionLocal
+from app.services.socket_service import sio
 
 # ── server start timestamp (for uptime calculation) ───────────────────
 _SERVER_START_TIME = time.time()
@@ -120,9 +120,9 @@ async def security_and_xss_middleware(request: Request, call_next):
     return response
 
 # ── register REST routers ─────────────────────────────────────────────
-from app.routes.auth import router as auth_router
-from app.routes.consultations import router as consultations_router
-from app.routes.chat import router as chat_router
+from app.api.auth import router as auth_router
+from app.api.consultations import router as consultations_router
+from app.api.chat import router as chat_router
 
 api.include_router(auth_router)
 api.include_router(consultations_router)
@@ -174,9 +174,9 @@ def health():
 # ── AI endpoints (translate + summarize) ──────────────────────────────
 from app.schemas import TranslateRequest, TranslateResponse, SummarizeRequest, SummarizeResponse
 from app.services.ai_service import translate_text, summarize_conversation
-from app.auth import get_current_user
-from app.models import User, Message, Session as ConsultationSession
-from app.database import get_db
+from app.core.security import get_current_user
+from app.models.models import User, Message, Session as ConsultationSession
+from app.core.database import get_db
 from fastapi import Depends
 from sqlalchemy.orm import Session as DBSession
 

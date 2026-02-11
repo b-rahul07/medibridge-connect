@@ -4,7 +4,7 @@ Database engine, session factory, and Base model.
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from app.config import settings
+from app.core.config import settings
 
 # Render provides postgres:// but SQLAlchemy 2.x requires postgresql://
 _db_url = settings.DATABASE_URL

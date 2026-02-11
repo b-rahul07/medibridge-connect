@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getMessages, getSocket, sendMessageRest, MessageOut } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { getMessages, getSocket, sendMessageRest, MessageOut } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 export const useMessages = (sessionId: string) => {
   const [messages, setMessages] = useState<MessageOut[]>([]);

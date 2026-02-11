@@ -11,11 +11,11 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session as DBSession
 
-from app.database import get_db, SessionLocal
-from app.models import User, Message, Session as ConsultationSession
+from app.core.database import get_db, SessionLocal
+from app.models.models import User, Message, Session as ConsultationSession
 from app.schemas import MessageOut, SendMessageRequest
-from app.auth import get_current_user
-from app.config import settings
+from app.core.security import get_current_user
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ async def _translate_and_broadcast(
 ):
     """Phase 2: translate text and broadcast 'message_updated' event."""
     from app.services.ai_service import translate_text
-    from app.sockets import sio
+    from app.services.socket_service import sio
 
     try:
         translated = await translate_text(content, target_language)
@@ -96,7 +96,7 @@ async def send_message_rest(
     alternative** to the Socket.IO ``send_message`` event — if the
     socket is disconnected the frontend can fall back here.
     """
-    from app.sockets import sio
+    from app.services.socket_service import sio
 
     session = (
         db.query(ConsultationSession)
@@ -204,7 +204,7 @@ async def upload_audio(
 
     # Broadcast the audio message via Socket.IO so the other participant
     # sees it in real-time (without needing a page refresh).
-    from app.sockets import sio
+    from app.services.socket_service import sio
     import asyncio
 
     room = f"session_{str(sid)}"
