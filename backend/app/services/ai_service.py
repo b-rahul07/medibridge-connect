@@ -101,8 +101,8 @@ async def summarize_conversation(messages_text: str) -> str:
             max_tokens=1024,
         )
         return (response.choices[0].message.content or "").strip()
-    except Exception as e:
-        print(f"[AI] Summary error: {e}")
+    except Exception:
+        logger.exception("Summarisation failed")
         return "[Summary generation failed]"
 
 

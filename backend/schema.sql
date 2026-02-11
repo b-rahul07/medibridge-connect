@@ -31,3 +31,11 @@ CREATE TABLE IF NOT EXISTS messages (
     audio_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Performance indexes for message queries
+CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_patient_id ON sessions(patient_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_doctor_id ON sessions(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);

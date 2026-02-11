@@ -21,9 +21,11 @@ from app.services.ai_service import translate_text
 logger = logging.getLogger(__name__)
 
 # ── create async Socket.IO server ─────────────────────────────────────
+from app.config import settings as _settings
+
 sio = socketio.AsyncServer(
     async_mode="asgi",
-    cors_allowed_origins="*",
+    cors_allowed_origins=_settings.CORS_ORIGINS,
     logger=True,
     engineio_logger=False,
 )
@@ -78,11 +80,37 @@ async def join_room(sid, data):
     if not session_id:
         return
 
+    # ── Authorisation: verify the user actually belongs to this session ──
+    ws_session = await sio.get_session(sid)
+    user_id = ws_session.get("user_id") if ws_session else None
+    if not user_id:
+        logger.warning("join_room rejected — no user_id in ws session (sid=%s)", sid)
+        return
+
+    db = _get_db()
+    try:
+        consultation = (
+            db.query(ConsultationSession)
+            .filter(ConsultationSession.id == uuid.UUID(session_id))
+            .first()
+        )
+        if not consultation:
+            logger.warning("join_room rejected — session %s not found (user=%s)", session_id, user_id)
+            return
+        if user_id not in (str(consultation.patient_id), str(consultation.doctor_id)):
+            logger.warning(
+                "join_room BLOCKED — user %s is not a participant of session %s",
+                user_id, session_id,
+            )
+            return
+    except Exception:
+        logger.exception("join_room DB check failed")
+        return
+    finally:
+        db.close()
+
     room = f"session_{session_id}"
     await sio.enter_room(sid, room)
-
-    ws_session = await sio.get_session(sid)
-    user_id = ws_session.get("user_id", "unknown") if ws_session else "unknown"
 
     # Debug: list who is in the room now
     participants = sio.manager.get_participants('/', room)
@@ -156,7 +184,11 @@ async def send_message(sid, data):
         logger.info("Phase 1 done — instant broadcast for %s", msg_id)
 
         # ── Phase 2: translate, save to DB, push update ─────────────
-        translated = await translate_text(content, target_language)
+        try:
+            translated = await translate_text(content, target_language)
+        except Exception:
+            logger.exception("AI translation failed for %s — using fallback", msg_id)
+            translated = "[Translation temporarily unavailable]"
 
         db = _get_db()
         try:

@@ -89,7 +89,7 @@ class Message(Base):
         UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False, index=True
     )
     sender_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
     content = Column(Text, nullable=False)
     translated_content = Column(Text, nullable=True)
