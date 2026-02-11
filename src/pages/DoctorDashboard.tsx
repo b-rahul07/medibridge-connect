@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { LogOut, Activity, User, Stethoscope, Plus, Clock, CheckCircle, MessageSquare, FileCheck, Search, X, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -62,8 +61,6 @@ const DoctorDashboard = () => {
     );
   };
 
-  // Sessions are now auto-fetched by useSessions hook via polling
-
   // Handler: Create new session (for patients)
   const handleCreateSession = async () => {
     if (!profile) return;
@@ -114,352 +111,365 @@ const DoctorDashboard = () => {
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-muted-foreground">Loading Profile...</p>
+          <p className="text-muted-foreground">Loading Profile...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 flex-shrink-0">
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* ── Header — matches landing page style ─────────────────────── */}
+      <header className="w-full px-6 lg:px-12 py-4 flex items-center justify-between border-b border-border/50">
         <div className="flex items-center gap-3">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-              <Activity className="w-4 h-4 text-primary-foreground" />
+          <Link to="/dashboard" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+              <Activity className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-bold text-foreground text-sm hidden sm:inline">MediBridge</span>
+            <span className="text-xl font-bold text-foreground tracking-tight hidden sm:inline">MediBridge</span>
           </Link>
 
-          <div className="h-5 w-px bg-border mx-1 hidden sm:block" />
+          <div className="h-6 w-px bg-border mx-1 hidden sm:block" />
 
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
               {profile?.role === 'doctor' ? (
-                <Stethoscope className="w-3.5 h-3.5 text-primary" />
+                <Stethoscope className="w-4 h-4 text-primary" />
               ) : (
-                <User className="w-3.5 h-3.5 text-muted-foreground" />
+                <User className="w-4 h-4 text-primary" />
               )}
             </div>
-            <div className="flex items-center gap-2 hidden sm:flex">
-              <span className="text-sm font-medium text-foreground">
-                {profile?.full_name || user?.email || 'User'}
-              </span>
-              <Badge 
-                variant={profile?.role === 'doctor' ? 'default' : 'secondary'}
-                className="text-[10px] px-2 py-0.5"
-              >
-                {profile?.role === 'doctor' ? 'Doctor View' : 'Patient View'}
-              </Badge>
+            <div className="hidden sm:block">
+              <p className="text-sm font-semibold text-foreground leading-tight">
+                {profile?.role === 'doctor' ? `Dr. ${profile.full_name}` : profile?.full_name || user?.email}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {profile?.role === 'doctor' ? 'Provider Dashboard' : 'Patient Dashboard'}
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <ThemeToggle />
           <Button
-            variant="destructive"
+            variant="outline"
             size="sm"
-            className="gap-1.5 text-xs"
+            className="gap-2 text-sm rounded-lg"
             onClick={handleSignOut}
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-4 h-4" />
             <span className="hidden sm:inline">Sign Out</span>
           </Button>
         </div>
       </header>
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-        <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
+      {/* ── Body ────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-6 lg:px-12 py-8 space-y-8">
           {/* Page Header */}
-          <div className="space-y-1 sm:space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Consultations</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/5 text-primary text-xs font-semibold tracking-wide">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {profile?.role === 'doctor' ? 'Provider Dashboard' : 'Patient Dashboard'}
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">
+              {profile?.role === 'patient' ? 'My Consultations' : 'Manage Patients'}
+            </h1>
+            <p className="text-base text-muted-foreground max-w-lg">
               {profile?.role === 'patient' 
-                ? 'Manage your consultation sessions with doctors'
-                : 'View and manage patient consultation requests'}
+                ? 'Request and manage your consultation sessions with doctors.'
+                : 'View incoming requests, manage active sessions, and review past consultations.'}
             </p>
           </div>
 
-          {/* Conversation Search */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={handleSearchKeyDown}
-                    placeholder="Search conversations by keyword..."
-                    className="pl-9 pr-9"
-                  />
-                  {searchInput && (
-                    <button
-                      onClick={handleClearSearch}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                <Button onClick={handleSearch} disabled={searching || !searchInput.trim()} className="gap-2">
-                  {searching ? (
-                    <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  Search
-                </Button>
+          {/* ── Conversation Search ──────────────────────────────── */}
+          <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search past conversations..."
+                  className="pl-10 pr-10 h-11 rounded-xl text-sm"
+                />
+                {searchInput && (
+                  <button
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
+              <Button onClick={handleSearch} disabled={searching || !searchInput.trim()} className="gap-2 h-11 rounded-xl px-6">
+                {searching ? (
+                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                Search
+              </Button>
+            </div>
 
-              {/* Search Results */}
-              {searchQuery && (
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      {searching ? 'Searching...' : `${searchResults.length} result(s) for "${searchQuery}"`}
-                    </p>
-                    {searchResults.length > 0 && (
-                      <Button variant="ghost" size="sm" onClick={handleClearSearch} className="text-xs">
-                        Clear
-                      </Button>
-                    )}
-                  </div>
+            {/* Search Results */}
+            {searchQuery && (
+              <div className="mt-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {searching ? 'Searching...' : `${searchResults.length} result(s) for "${searchQuery}"`}
+                  </p>
                   {searchResults.length > 0 && (
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {searchResults.map((result) => (
-                        <div
-                          key={result.id}
-                          className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border bg-muted/50 hover:bg-muted transition-colors"
-                        >
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <p className="text-sm leading-relaxed break-words">
-                              {highlightMatch(result.content, searchQuery)}
-                            </p>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(result.created_at).toLocaleString()}
-                              </span>
-                              <span className="font-mono">
-                                Session: {result.session_id.slice(0, 8)}...
-                              </span>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="flex-shrink-0 gap-1"
-                            onClick={() => navigate('/session/' + result.session_id)}
-                          >
-                            <ArrowRight className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {!searching && searchResults.length === 0 && (
-                    <div className="text-center py-6">
-                      <Search className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">No messages found matching "{searchQuery}"</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Patient View */}
-          {profile?.role === 'patient' && (
-            <div className="space-y-6">
-              {/* Create Session Button */}
-              <Card>
-                <CardContent className="pt-6">
-                  {sessions.some(s => s.status === 'waiting' || s.status === 'active') ? (
-                    <p className="text-center text-sm text-muted-foreground py-4">
-                      You already have an open consultation. Complete or wait for it before requesting a new one.
-                    </p>
-                  ) : (
-                    <Button 
-                      onClick={handleCreateSession}
-                      disabled={loadingSessions}
-                      className="w-full h-16 text-lg gap-3"
-                      size="lg"
-                    >
-                      <Plus className="w-6 h-6" />
-                      {loadingSessions ? 'Creating...' : 'Request New Consultation'}
+                    <Button variant="ghost" size="sm" onClick={handleClearSearch} className="text-xs">
+                      Clear
                     </Button>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+                {searchResults.length > 0 && (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {searchResults.map((result) => (
+                      <div
+                        key={result.id}
+                        className="flex items-start justify-between gap-3 p-4 rounded-xl border border-border bg-muted/30 hover:bg-muted/60 transition-colors cursor-pointer"
+                        onClick={() => navigate('/session/' + result.session_id)}
+                      >
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <p className="text-sm leading-relaxed break-words">
+                            {highlightMatch(result.content, searchQuery)}
+                          </p>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {new Date(result.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!searching && searchResults.length === 0 && (
+                  <div className="text-center py-8">
+                    <Search className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">No messages found matching "{searchQuery}"</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-              {/* Sessions List */}
+          {/* ── Patient View ─────────────────────────────────────── */}
+          {profile?.role === 'patient' && (
+            <div className="space-y-8">
+              {/* Create Session CTA */}
+              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                {sessions.some(s => s.status === 'waiting' || s.status === 'active') ? (
+                  <div className="text-center py-4">
+                    <div className="w-12 h-12 rounded-2xl bg-yellow-100 dark:bg-yellow-500/10 flex items-center justify-center mx-auto mb-3">
+                      <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">Session Already Active</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Complete your current consultation before requesting a new one.
+                    </p>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={handleCreateSession}
+                    disabled={loadingSessions}
+                    className="w-full h-14 text-base gap-3 rounded-xl shadow-lg shadow-primary/20"
+                    size="lg"
+                  >
+                    <Plus className="w-5 h-5" />
+                    {loadingSessions ? 'Creating...' : 'Request New Consultation'}
+                  </Button>
+                )}
+              </div>
+
+              {/* Active + Waiting Sessions */}
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Your Sessions</h2>
+                <h2 className="text-xl font-bold text-foreground flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center">
+                    <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  Your Sessions
+                </h2>
                 {loadingSessions && sessions.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <div className="text-center py-16">
+                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-sm text-muted-foreground">Loading sessions...</p>
                   </div>
-                ) : sessions.length === 0 ? (
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No consultation sessions yet</p>
-                      <p className="text-sm text-muted-foreground mt-2">Click the button above to request a consultation</p>
-                    </CardContent>
-                  </Card>
+                ) : sessions.filter(s => s.status !== 'completed').length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                      <MessageSquare className="w-7 h-7 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-foreground">No active sessions</p>
+                    <p className="text-sm text-muted-foreground mt-1">Click above to request a consultation</p>
+                  </div>
                 ) : (
                   <div className="grid gap-4">
-                    {sessions.map((session) => (
-                      <Card key={session.id}>
-                        <CardContent className="pt-6">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-1">
+                    {sessions.filter(s => s.status !== 'completed').map((session) => (
+                      <div key={session.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              session.status === 'active'
+                                ? 'bg-emerald-100 dark:bg-emerald-500/10'
+                                : 'bg-yellow-100 dark:bg-yellow-500/10'
+                            }`}>
+                              {session.status === 'active'
+                                ? <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                : <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                              }
+                            </div>
+                            <div>
                               {session.doctor && (
-                                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                                  <Stethoscope className="w-3.5 h-3.5 text-primary" />
+                                <p className="text-sm font-semibold text-foreground">
                                   Dr. {session.doctor.full_name}
                                 </p>
                               )}
-                              <div className="flex items-center gap-2 text-muted-foreground">
-                                <Clock className="w-4 h-4" />
-                                <span className="text-sm">
-                                  {new Date(session.created_at).toLocaleString()}
-                                </span>
-                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(session.created_at).toLocaleString()}
+                              </p>
                             </div>
-                            <Badge 
-                              variant={session.status === 'waiting' ? 'secondary' : session.status === 'active' ? 'default' : 'outline'}
-                              className="gap-1"
-                            >
-                              {session.status === 'waiting' && <Clock className="w-3 h-3" />}
-                              {session.status === 'active' && <CheckCircle className="w-3 h-3" />}
-                              {session.status === 'completed' && <FileCheck className="w-3 h-3" />}
-                              {session.status === 'waiting' ? 'Waiting for Doctor' : session.status === 'active' ? 'Active' : 'Completed'}
-                            </Badge>
                           </div>
-                          {session.status === 'active' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full mt-3 gap-2"
-                              onClick={() => navigate('/session/' + session.id)}
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              Open Chat
-                            </Button>
-                          )}
-                        </CardContent>
-                      </Card>
+                          <Badge 
+                            variant={session.status === 'active' ? 'default' : 'secondary'}
+                            className="gap-1.5 rounded-full px-3"
+                          >
+                            {session.status === 'waiting' && <Clock className="w-3 h-3" />}
+                            {session.status === 'active' && <CheckCircle className="w-3 h-3" />}
+                            {session.status === 'waiting' ? 'Waiting' : 'Active'}
+                          </Badge>
+                        </div>
+                        {session.status === 'active' && (
+                          <Button
+                            variant="outline"
+                            className="w-full mt-4 gap-2.5 h-10 rounded-xl"
+                            onClick={() => navigate('/session/' + session.id)}
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            Open Chat
+                          </Button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
+
               {/* Past Consultations */}
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <FileCheck className="w-5 h-5 text-blue-500" />
+                <h2 className="text-xl font-bold text-foreground flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-500/10 flex items-center justify-center">
+                    <FileCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  </div>
                   Past Consultations
                 </h2>
                 {sessions.filter(s => s.status === 'completed').length === 0 ? (
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <FileCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No completed consultations yet</p>
-                    </CardContent>
-                  </Card>
+                  <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                      <FileCheck className="w-7 h-7 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-foreground">No completed consultations yet</p>
+                  </div>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {sessions.filter(s => s.status === 'completed').map((session) => (
-                      <Card key={session.id}>
-                        <CardHeader>
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <FileCheck className="w-4 h-4 text-blue-500" />
-                            {session.doctor
-                              ? `Dr. ${session.doctor.full_name}`
-                              : 'Completed Session'}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Clock className="w-4 h-4" />
-                              {new Date(session.created_at).toLocaleString()}
-                            </div>
+                      <div key={session.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/10 flex items-center justify-center">
+                            <Stethoscope className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                           </div>
-                          {session.summary && (
-                            <div className="border-t pt-4">
-                              <h4 className="text-xs font-semibold mb-2 text-muted-foreground">Summary:</h4>
-                              <div className="text-xs text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap">
-                                {session.summary}
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {session.doctor ? `Dr. ${session.doctor.full_name}` : 'Completed Session'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(session.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        {session.summary && (
+                          <div className="border-t border-border pt-3">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1.5">Summary</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap">
+                              {session.summary}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
-              </div>            </div>
+              </div>
+            </div>
           )}
 
-          {/* Doctor View */}
+          {/* ── Doctor View ──────────────────────────────────────── */}
           {profile?.role === 'doctor' && (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {/* Incoming Requests */}
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-yellow-500" />
+                <h2 className="text-xl font-bold text-foreground flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-yellow-100 dark:bg-yellow-500/10 flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                  </div>
                   Incoming Requests
+                  {sessions.filter(s => s.status === 'waiting').length > 0 && (
+                    <Badge variant="secondary" className="rounded-full ml-1">
+                      {sessions.filter(s => s.status === 'waiting').length}
+                    </Badge>
+                  )}
                 </h2>
                 {loadingSessions ? (
-                  <div className="text-center py-12">
-                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <div className="text-center py-16">
+                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-sm text-muted-foreground">Loading sessions...</p>
                   </div>
                 ) : sessions.filter(s => s.status === 'waiting').length === 0 ? (
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No pending consultation requests</p>
-                    </CardContent>
-                  </Card>
+                  <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                      <Clock className="w-7 h-7 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-foreground">No pending requests</p>
+                    <p className="text-sm text-muted-foreground mt-1">New patient requests will appear here</p>
+                  </div>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {sessions.filter(s => s.status === 'waiting').map((session) => (
-                      <Card key={session.id}>
-                        <CardHeader>
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            {session.patient?.full_name || 'Patient'}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Clock className="w-4 h-4" />
-                              {new Date(session.created_at).toLocaleString()}
-                            </div>
-                            {session.patient_language && (
-                              <p className="text-xs text-muted-foreground">
-                                Language: {session.patient_language}
-                              </p>
-                            )}
+                      <div key={session.id} className="rounded-2xl border border-yellow-200 dark:border-yellow-800/50 bg-yellow-50/50 dark:bg-yellow-950/20 p-5 shadow-sm">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-xl bg-yellow-100 dark:bg-yellow-500/10 flex items-center justify-center">
+                            <User className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
                           </div>
-                          <Button 
-                            onClick={() => handleAcceptSession(session.id)}
-                            className="w-full gap-2"
-                            disabled={loadingSessions}
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Accept Patient
-                          </Button>
-                        </CardContent>
-                      </Card>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {session.patient?.full_name || 'Patient'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(session.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        {session.patient_language && (
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Language: <span className="font-medium text-foreground">{session.patient_language}</span>
+                          </p>
+                        )}
+                        <Button 
+                          onClick={() => handleAcceptSession(session.id)}
+                          className="w-full gap-2.5 h-10 rounded-xl shadow-sm"
+                          disabled={loadingSessions}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Accept Patient
+                        </Button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -467,44 +477,46 @@ const DoctorDashboard = () => {
 
               {/* Active Consultations */}
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  My Active Consultations
+                <h2 className="text-xl font-bold text-foreground flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  Active Consultations
                 </h2>
                 {sessions.filter(s => s.status === 'active' && s.doctor_id === profile.id).length === 0 ? (
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No active consultations</p>
-                    </CardContent>
-                  </Card>
+                  <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                      <MessageSquare className="w-7 h-7 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-foreground">No active consultations</p>
+                    <p className="text-sm text-muted-foreground mt-1">Accept a patient request to begin</p>
+                  </div>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {sessions.filter(s => s.status === 'active' && s.doctor_id === profile.id).map((session) => (
-                      <Card key={session.id}>
-                        <CardHeader>
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                            {session.patient?.full_name || 'Patient'}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Clock className="w-4 h-4" />
-                              {new Date(session.created_at).toLocaleString()}
-                            </div>
+                      <div key={session.id} className="rounded-2xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-5 shadow-sm">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center">
+                            <User className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                           </div>
-                          <Button 
-                            variant="outline"
-                            className="w-full gap-2"
-                            onClick={() => navigate('/session/' + session.id)}
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                            Continue Chat
-                          </Button>
-                        </CardContent>
-                      </Card>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {session.patient?.full_name || 'Patient'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(session.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline"
+                          className="w-full gap-2.5 h-10 rounded-xl"
+                          onClick={() => navigate('/session/' + session.id)}
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Continue Chat
+                        </Button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -512,44 +524,45 @@ const DoctorDashboard = () => {
 
               {/* Past Consultations */}
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <FileCheck className="w-5 h-5 text-blue-500" />
+                <h2 className="text-xl font-bold text-foreground flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-500/10 flex items-center justify-center">
+                    <FileCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  </div>
                   Past Consultations
                 </h2>
                 {sessions.filter(s => s.status === 'completed').length === 0 ? (
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <FileCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No completed consultations yet</p>
-                    </CardContent>
-                  </Card>
+                  <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                      <FileCheck className="w-7 h-7 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-foreground">No completed consultations yet</p>
+                  </div>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {sessions.filter(s => s.status === 'completed').map((session) => (
-                      <Card key={session.id}>
-                        <CardHeader>
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <FileCheck className="w-4 h-4 text-blue-500" />
-                            {session.patient?.full_name || 'Patient'}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Clock className="w-4 h-4" />
-                              {new Date(session.created_at).toLocaleString()}
-                            </div>
+                      <div key={session.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/10 flex items-center justify-center">
+                            <User className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                           </div>
-                          {session.summary && (
-                            <div className="border-t pt-4">
-                              <h4 className="text-xs font-semibold mb-2 text-muted-foreground">Summary:</h4>
-                              <div className="text-xs text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap">
-                                {session.summary}
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {session.patient?.full_name || 'Patient'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(session.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        {session.summary && (
+                          <div className="border-t border-border pt-3">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1.5">Summary</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap">
+                              {session.summary}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -558,6 +571,11 @@ const DoctorDashboard = () => {
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+export default DoctorDashboard;
     </div>
   );
 };

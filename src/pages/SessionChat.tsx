@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Send, Languages, Mic, Square, Loader2, FileCheck } from 'lucide-react';
+import { ArrowLeft, Send, Languages, Mic, Square, Loader2, FileCheck, Stethoscope, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
 import { useSessions } from '@/hooks/useSessions';
@@ -45,7 +45,7 @@ const SessionChat = () => {
       .catch((err) => console.error('Failed to load session detail:', err));
   }, [sessionId]);
 
-  // Derive the other party's name
+  // Derive names and roles for message display
   const otherPartyName = (() => {
     if (!sessionDetail || !user) return null;
     if (user.role === 'doctor') {
@@ -55,6 +55,34 @@ const SessionChat = () => {
       ? `Dr. ${sessionDetail.doctor.full_name}`
       : null;
   })();
+
+  const myName = (() => {
+    if (!user) return 'You';
+    if (user.role === 'doctor') return `Dr. ${user.full_name}`;
+    return user.full_name || 'You';
+  })();
+
+  // Helper: get sender info from message
+  const getSenderInfo = (senderId: string) => {
+    if (!sessionDetail) return { name: 'Unknown', role: 'patient' as const };
+    
+    const isDoctor = senderId === sessionDetail.doctor_id;
+    const isPatient = senderId === sessionDetail.patient_id;
+    
+    if (isDoctor) {
+      return {
+        name: sessionDetail.doctor?.full_name ? `Dr. ${sessionDetail.doctor.full_name}` : 'Doctor',
+        role: 'doctor' as const,
+      };
+    }
+    if (isPatient) {
+      return {
+        name: sessionDetail.patient?.full_name || 'Patient',
+        role: 'patient' as const,
+      };
+    }
+    return { name: 'Unknown', role: 'patient' as const };
+  };
 
   // Audio recording
   const { startRecording, stopRecording, isRecording, audioBlob, clearRecording } = useAudioRecorder();
@@ -140,24 +168,56 @@ const SessionChat = () => {
     }
   };
 
+  // Determine if a message is "mine" using multiple checks for robustness
+  const isMyMessage = (senderId: string): boolean => {
+    // Primary check: compare sender_id with authenticated user's id
+    if (user?.id && String(senderId) === String(user.id)) return true;
+    // Secondary check: compare with session detail participant IDs by role
+    if (sessionDetail && user?.role === 'doctor' && senderId === sessionDetail.doctor_id) return true;
+    if (sessionDetail && user?.role === 'patient' && senderId === sessionDetail.patient_id) return true;
+    return false;
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card flex items-center justify-between px-3 sm:px-4 py-2 flex-shrink-0 gap-2">
-        <Link to="/dashboard" className="flex-shrink-0">
-          <Button variant="ghost" size="sm" className="gap-1 sm:gap-2 px-2 sm:px-3">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Back to Dashboard</span>
-          </Button>
-        </Link>
+      <header className="border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 sm:px-6 py-3 flex-shrink-0 gap-3">
+        <div className="flex items-center gap-3">
+          <Link to="/dashboard">
+            <Button variant="ghost" size="sm" className="gap-2 px-2 sm:px-3">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </Button>
+          </Link>
+
+          <div className="h-5 w-px bg-border hidden sm:block" />
+          
+          {/* Session info */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+              {user?.role === 'doctor' 
+                ? <User className="w-4 h-4 text-primary" />
+                : <Stethoscope className="w-4 h-4 text-primary" />
+              }
+            </div>
+            <div className="hidden sm:block">
+              <p className="text-sm font-semibold text-foreground leading-tight">
+                {otherPartyName || `Session ${sessionId?.slice(0, 8)}...`}
+              </p>
+              <p className="text-[11px] text-emerald-500 font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live Session
+              </p>
+            </div>
+          </div>
+        </div>
         
-        <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-end">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Single Language Selector: My Preferred Language */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5">
             <Languages className="w-4 h-4 text-muted-foreground hidden sm:block" />
-            <span className="text-xs text-muted-foreground hidden sm:inline">My Language:</span>
             <Select value={myLanguage} onValueChange={handleMyLanguageChange}>
-              <SelectTrigger className="w-[100px] sm:w-[130px] h-8 text-xs sm:text-sm">
+              <SelectTrigger className="w-[100px] sm:w-[140px] h-9 text-xs sm:text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -169,12 +229,6 @@ const SessionChat = () => {
               </SelectContent>
             </Select>
           </div>
-          
-          <h1 className="text-xs sm:text-sm font-medium text-foreground hidden md:block">
-            {otherPartyName
-              ? `Chat with ${otherPartyName}`
-              : `Session: ${sessionId?.slice(0, 8)}...`}
-          </h1>
 
           {/* End Consultation Button (Doctors only) */}
           {profile?.role === 'doctor' && (
@@ -183,16 +237,16 @@ const SessionChat = () => {
               disabled={isEndingSession}
               variant="destructive"
               size="sm"
-              className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+              className="gap-2 text-xs sm:text-sm"
             >
               {isEndingSession ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="hidden sm:inline">Ending...</span>
                 </>
               ) : (
                 <>
-                  <FileCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <FileCheck className="w-4 h-4" />
                   <span className="hidden sm:inline">End Consultation</span>
                 </>
               )}
@@ -202,37 +256,66 @@ const SessionChat = () => {
       </header>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-4">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-sm text-muted-foreground">Loading messages...</p>
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-muted-foreground">Loading messages...</p>
             </div>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-2">
-              <p className="text-muted-foreground">No messages yet</p>
-              <p className="text-sm text-muted-foreground">Start the conversation below</p>
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                <Languages className="w-8 h-8 text-primary" />
+              </div>
+              <p className="text-lg font-semibold text-foreground">No messages yet</p>
+              <p className="text-sm text-muted-foreground">Send a message below to start the conversation</p>
             </div>
           </div>
         ) : (
           <>
             {messages.map((message) => {
-              const isMe = message.sender_id === user?.id;
+              const isMe = isMyMessage(message.sender_id);
+              const sender = getSenderInfo(message.sender_id);
+              const isDoctor = sender.role === 'doctor';
               
               return (
                 <div
                   key={message.id}
                   className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                 >
-                  {/* Chat Bubble — contains ONLY the original text */}
+                  {/* Sender label */}
+                  <div className={`flex items-center gap-1.5 mb-1.5 px-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                      isDoctor ? 'bg-indigo-100 dark:bg-indigo-500/20' : 'bg-emerald-100 dark:bg-emerald-500/20'
+                    }`}>
+                      {isDoctor
+                        ? <Stethoscope className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                        : <User className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      }
+                    </div>
+                    <span className={`text-xs font-medium ${
+                      isDoctor ? 'text-indigo-600 dark:text-indigo-400' : 'text-emerald-600 dark:text-emerald-400'
+                    }`}>
+                      {isMe ? 'You' : sender.name}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+
+                  {/* Chat Bubble */}
                   <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+                    className={`max-w-[80%] sm:max-w-[70%] rounded-2xl px-5 py-3.5 shadow-sm ${
                       isMe
-                        ? 'bg-primary text-primary-foreground rounded-br-md'
-                        : 'bg-muted text-foreground border border-border rounded-bl-md'
+                        ? isDoctor
+                          ? 'bg-indigo-600 text-white rounded-br-md'
+                          : 'bg-emerald-600 text-white rounded-br-md'
+                        : isDoctor
+                          ? 'bg-indigo-50 dark:bg-indigo-950/40 text-foreground border border-indigo-200 dark:border-indigo-800 rounded-bl-md'
+                          : 'bg-emerald-50 dark:bg-emerald-950/40 text-foreground border border-emerald-200 dark:border-emerald-800 rounded-bl-md'
                     }`}
                   >
                     {/* Audio Message */}
@@ -240,42 +323,37 @@ const SessionChat = () => {
                       <audio 
                         controls 
                         src={message.audio_url.startsWith('http') ? message.audio_url : `${API_BASE}${message.audio_url}`} 
-                        className="max-w-[250px] h-10"
+                        className="max-w-[280px] h-11"
                         style={{
                           filter: isMe ? 'invert(1) hue-rotate(180deg)' : 'none'
                         }}
                       />
                     ) : (
-                      <p className="text-sm leading-relaxed break-words">
+                      <p className="text-[15px] leading-relaxed break-words">
                         {message.content}
                       </p>
                     )}
-                    
-                    {/* Timestamp */}
-                    <p
-                      className={`text-[10px] mt-1 ${
-                        isMe ? 'text-primary-foreground/60' : 'text-muted-foreground'
-                      }`}
-                    >
-                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
                   </div>
 
                   {/* Translation — shown BELOW the bubble, prominent */}
                   {!message.audio_url && (
                     <div
-                      className={`max-w-[75%] mt-1 px-3 ${
+                      className={`max-w-[80%] sm:max-w-[70%] mt-1.5 px-2 ${
                         isMe ? 'text-right' : 'text-left'
                       }`}
                     >
                       {message.translated_content ? (
-                        <p className="text-sm italic text-muted-foreground leading-relaxed">
+                        <p className={`text-[14px] italic leading-relaxed ${
+                          isDoctor
+                            ? 'text-indigo-500 dark:text-indigo-400'
+                            : 'text-emerald-600 dark:text-emerald-400'
+                        }`}>
                           {message.translated_content}
                         </p>
                       ) : (
                         <div className={`flex items-center gap-1.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                          <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/50" />
-                          <span className="text-xs italic text-muted-foreground/50">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/60" />
+                          <span className="text-xs italic text-muted-foreground/60">
                             Translating...
                           </span>
                         </div>
@@ -291,8 +369,8 @@ const SessionChat = () => {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-border bg-card px-4 py-3 flex-shrink-0">
-        <form onSubmit={handleSend} className="flex items-center gap-3">
+      <div className="border-t border-border bg-card/80 backdrop-blur-sm px-4 sm:px-6 py-4 flex-shrink-0">
+        <form onSubmit={handleSend} className="flex items-center gap-3 max-w-4xl mx-auto">
           {/* Voice Recording Button */}
           <Button
             type="button"
@@ -300,7 +378,7 @@ const SessionChat = () => {
             variant={isRecording ? 'destructive' : 'outline'}
             onClick={handleVoiceToggle}
             disabled={loading || isSending || isUploadingAudio}
-            className="flex-shrink-0"
+            className="flex-shrink-0 w-10 h-10 rounded-xl"
           >
             {isUploadingAudio ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -315,14 +393,14 @@ const SessionChat = () => {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder={`Type in ${SUPPORTED_LANGUAGES.find(l => l.code === myLanguage)?.name || 'your language'}...`}
-            className="flex-1"
+            className="flex-1 h-11 rounded-xl text-[15px] px-4"
             disabled={loading || isSending || isRecording || isUploadingAudio}
           />
           <Button
             type="submit"
             size="icon"
             disabled={!newMessage.trim() || loading || isSending || isRecording || isUploadingAudio}
-            className="flex-shrink-0"
+            className="flex-shrink-0 w-10 h-10 rounded-xl"
           >
             {isSending ? (
               <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
