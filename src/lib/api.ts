@@ -182,6 +182,22 @@ export async function getMessages(sessionId: string): Promise<MessageOut[]> {
   return request<MessageOut[]>(`/chat/${sessionId}/messages`);
 }
 
+/**
+ * Send a text message via REST API (reliable fallback for Socket.IO).
+ * The backend broadcasts the message to the Socket.IO room so both
+ * participants receive the real-time event.
+ */
+export async function sendMessageRest(
+  sessionId: string,
+  content: string,
+  senderLanguage?: string,
+): Promise<MessageOut> {
+  return request<MessageOut>(`/chat/${sessionId}/send`, {
+    method: 'POST',
+    body: JSON.stringify({ content, sender_language: senderLanguage }),
+  });
+}
+
 export async function uploadAudio(
   sessionId: string,
   audioBlob: Blob,

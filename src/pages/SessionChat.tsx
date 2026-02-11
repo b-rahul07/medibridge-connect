@@ -3,20 +3,20 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Send, Languages, Mic, Square, Loader2, FileCheck, Stethoscope, User } from 'lucide-react';
+import { ArrowLeft, Send, Languages, Mic, Square, Loader2, FileCheck, Stethoscope, User, WifiOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
-import { useSessions } from '@/hooks/useSessions';
 import { SUPPORTED_LANGUAGES } from '@/lib/translator';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { summarizeSession, uploadAudio, API_BASE, getSession, SessionOut } from '@/lib/api';
+import { summarizeSession, uploadAudio, API_BASE, getSession, endConsultation, SessionOut } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 const SessionChat = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { messages, loading, sendMessage } = useMessages(sessionId!);
-  const { endSession } = useSessions();
+  const { toast } = useToast();
+  const { messages, loading, connected, sendMessage } = useMessages(sessionId!);
   const [sessionDetail, setSessionDetail] = useState<SessionOut | null>(null);
   const [newMessage, setNewMessage] = useState('');
 
@@ -124,20 +124,26 @@ const SessionChat = () => {
     }
   };
 
-  // Handle sending a message (via Socket.IO — backend handles translation)
+  // Handle sending a message (via REST API — backend also broadcasts via Socket.IO)
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
     if (!newMessage.trim() || !user || isSending) return;
 
+    const textToSend = newMessage;
+    setNewMessage(''); // clear input immediately for snappy UX
     setIsSending(true);
     try {
-      // Send message via Socket.IO; backend auto-detects target language
-      await sendMessage(newMessage, myLanguage);
-      
-      setNewMessage('');
+      await sendMessage(textToSend, myLanguage);
     } catch (error) {
-      console.error('Failed to send message:', error);
+      // Restore the message in the input so the user can retry
+      setNewMessage(textToSend);
+      const msg = error instanceof Error ? error.message : 'Failed to send message';
+      toast({
+        variant: 'destructive',
+        title: 'Send failed',
+        description: msg,
+      });
     } finally {
       setIsSending(false);
     }
@@ -155,14 +161,18 @@ const SessionChat = () => {
       // Generate + persist summary via backend
       const summary = await summarizeSession(sessionId);
       
-      // End the session with the summary
-      await endSession(sessionId, summary, user.id, profile.role);
+      // End the session with the summary (direct API call — no useSessions polling)
+      await endConsultation(sessionId, summary);
       
       // Navigate back to dashboard
       navigate('/dashboard');
     } catch (error) {
       console.error('Failed to end consultation:', error);
-      alert('Failed to end consultation. Please try again.');
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to end consultation. Please try again.',
+      });
     } finally {
       setIsEndingSession(false);
     }
@@ -204,10 +214,17 @@ const SessionChat = () => {
               <p className="text-sm font-semibold text-foreground leading-tight">
                 {otherPartyName || `Session ${sessionId?.slice(0, 8)}...`}
               </p>
-              <p className="text-[11px] text-emerald-500 font-medium flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live Session
-              </p>
+              {connected ? (
+                <p className="text-[11px] text-emerald-500 font-medium flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Session
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-500 font-medium flex items-center gap-1">
+                  <WifiOff className="w-3 h-3" />
+                  Reconnecting...
+                </p>
+              )}
             </div>
           </div>
         </div>

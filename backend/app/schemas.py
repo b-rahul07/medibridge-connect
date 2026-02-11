@@ -100,7 +100,7 @@ class MessageOut(BaseModel):
 
 class SendMessageRequest(BaseModel):
     content: str
-    target_language: str = "en"
+    sender_language: Optional[str] = None
 
 
 # ═══════════════════════════════════════════════════════════════════════
