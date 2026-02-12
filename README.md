@@ -22,6 +22,21 @@ Audio files now persist to Cloudinary with CDN delivery, solving ephemeral files
 ### 📊 **Scalability: Cursor-Based Pagination**
 Message endpoints now support `?limit=50&cursor={message_id}` pagination (max 100), preventing browser crashes with long conversations. Handles 10,000+ message sessions efficiently with sub-20ms query times.
 
+### 🐛 **Bug Fixes Applied During Implementation**
+
+The three features above introduced several cross-cutting issues that were identified and resolved:
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| **Sign-in not working (local dev)** | `fetch()` wrapper missing `credentials: 'include'` — browser silently dropped the `Set-Cookie` header from login responses | Added `credentials: 'include'` to the generic `request()` wrapper in `api.ts` |
+| **Sign-in not working (cross-origin)** | Frontend (Vercel, port 8080) and backend (Render, port 8000) are different origins — `SameSite=Lax` cookies are never sent cross-origin | Added Vite dev proxy for same-origin requests in development; returned JWT in response body so frontend stores it in `sessionStorage` and sends via `Authorization` header in production |
+| **Socket.IO "Reconnecting..." loop** | Socket.IO client had `auth: { token }` removed during cookie migration — backend rejected every connection, causing infinite reconnect | Restored `auth: { token: getToken() }` on Socket.IO client; added cookie-based fallback parsing on backend for both ASGI and WSGI header formats |
+| **"Translating..." stuck forever** | Socket.IO unable to connect meant `message_updated` events never arrived — Phase 2 translation broadcast was lost | Fixed by resolving the Socket.IO connection issue above; translations now flow via the two-phase broadcast pattern |
+| **Cookie `Secure` flag mismatch** | Cookies set with `secure=False` + `SameSite=Lax` in production HTTPS — browsers require `SameSite=None; Secure` for cross-origin cookies | Auto-detect production via CORS origins: if any origin uses `https://`, set `SameSite=None; Secure` automatically |
+| **Backend crash on startup** | Pagination docstrings had `):    """` (no newline after colon) — Python syntax error prevented the backend from starting at all | Fixed docstring formatting in `chat.py` for both `get_messages` and `upload_audio` endpoints |
+| **Missing messages (50+ conversations)** | Frontend called `getMessages()` once without pagination params — only got first 50 messages, older messages disappeared | Added `getAllMessages()` that auto-paginates through all pages on initial chat load |
+| **Logout not clearing token** | `signOut()` called the logout endpoint but never cleared `sessionStorage` — stale tokens persisted across sessions | Added `clearToken()` call at the start of `signOut()` |
+
 ---
 
 ## 🚀 Features
