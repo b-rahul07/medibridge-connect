@@ -77,13 +77,16 @@ def set_auth_cookie(response: Response, token: str) -> None:
         response: FastAPI Response object to set the cookie on.
         token: JWT token to store.
     """
+    # In production (cross-origin, HTTPS) we need SameSite=None + Secure.
+    # Detect via CORS_ORIGINS: if any origin uses https, assume production.
+    is_production = any(o.startswith("https://") for o in settings.CORS_ORIGINS)
     response.set_cookie(
         key="auth_token",
         value=token,
-        httponly=True,  # Prevents JavaScript access (XSS protection)
-        samesite="lax",  # CSRF protection
-        secure=False,  # Set to True in production with HTTPS
-        max_age=settings.JWT_EXPIRATION_MINUTES * 60,  # Convert minutes to seconds
+        httponly=True,
+        samesite="none" if is_production else "lax",
+        secure=is_production,
+        max_age=settings.JWT_EXPIRATION_MINUTES * 60,
         path="/",
     )
 

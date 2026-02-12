@@ -13,7 +13,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/signup", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def signup(body: SignUpRequest, response: Response, db: DBSession = Depends(get_db)):
     # check duplicate
     existing = db.query(User).filter(User.email == body.email).first()
@@ -35,10 +35,10 @@ def signup(body: SignUpRequest, response: Response, db: DBSession = Depends(get_
 
     token = create_access_token(user.id, user.role)
     set_auth_cookie(response, token)
-    return UserOut.model_validate(user)
+    return TokenResponse(access_token=token, user=UserOut.model_validate(user))
 
 
-@router.post("/login", response_model=UserOut)
+@router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, response: Response, db: DBSession = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not verify_password(body.password, user.password_hash):
@@ -49,7 +49,7 @@ def login(body: LoginRequest, response: Response, db: DBSession = Depends(get_db
 
     token = create_access_token(user.id, user.role)
     set_auth_cookie(response, token)
-    return UserOut.model_validate(user)
+    return TokenResponse(access_token=token, user=UserOut.model_validate(user))
 
 
 @router.get("/me", response_model=UserOut)
@@ -62,11 +62,13 @@ def get_me(
 @router.post("/logout")
 def logout(response: Response):
     """Clear the httpOnly auth cookie."""
+    from app.core.config import settings as _s
+    is_production = any(o.startswith("https://") for o in _s.CORS_ORIGINS)
     response.delete_cookie(
         key="auth_token",
         path="/",
         httponly=True,
-        samesite="lax",
-        secure=False,  # Set to True in production with HTTPS
+        samesite="none" if is_production else "lax",
+        secure=is_production,
     )
     return {"message": "Logged out successfully"}

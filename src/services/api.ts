@@ -101,20 +101,26 @@ export async function signup(
   full_name: string,
   role: 'doctor' | 'patient',
 ): Promise<UserOut> {
-  return request<UserOut>('/auth/signup', {
+  const res = await request<TokenResponse>('/auth/signup', {
     method: 'POST',
     body: JSON.stringify({ email, password, full_name, role }),
   });
+  // Store token for cross-origin auth (production) & Socket.IO
+  if (res.access_token) setToken(res.access_token);
+  return res.user;
 }
 
 export async function login(
   email: string,
   password: string,
 ): Promise<UserOut> {
-  return request<UserOut>('/auth/login', {
+  const res = await request<TokenResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
+  // Store token for cross-origin auth (production) & Socket.IO
+  if (res.access_token) setToken(res.access_token);
+  return res.user;
 }
 
 export async function getMe(): Promise<UserOut> {
@@ -122,6 +128,7 @@ export async function getMe(): Promise<UserOut> {
 }
 
 export function signOut(): void {
+  clearToken();
   // Call logout endpoint to clear httpOnly cookie
   fetch(`${API_BASE}/auth/logout`, {
     method: 'POST',
