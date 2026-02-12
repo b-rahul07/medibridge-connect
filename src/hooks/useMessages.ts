@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getMessages, getSocket, sendMessageRest, MessageOut } from '@/services/api';
+import { getAllMessages, getSocket, sendMessageRest, MessageOut } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 
 export const useMessages = (sessionId: string) => {
@@ -14,11 +14,11 @@ export const useMessages = (sessionId: string) => {
     if (!sessionId) return;
     joinedRef.current = false;
 
-    // A) REST fetch for existing messages
+    // A) REST fetch for existing messages (paginated — fetches all pages)
     const fetchInitial = async () => {
       setLoading(true);
       try {
-        const data = await getMessages(sessionId);
+        const data = await getAllMessages(sessionId);
         setMessages(data);
       } catch (error) {
         console.error('Error fetching messages:', error);

@@ -184,8 +184,33 @@ export async function searchMessagesDetail(query: string): Promise<MessageOut[]>
 }
 
 // ── chat / messages ───────────────────────────────────────────────────
-export async function getMessages(sessionId: string): Promise<MessageOut[]> {
-  return request<MessageOut[]>(`/chat/${sessionId}/messages`);
+export async function getMessages(
+  sessionId: string,
+  limit?: number,
+  cursor?: string,
+): Promise<MessageOut[]> {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', String(limit));
+  if (cursor) params.set('cursor', cursor);
+  const qs = params.toString();
+  return request<MessageOut[]>(`/chat/${sessionId}/messages${qs ? `?${qs}` : ''}`);
+}
+
+/**
+ * Fetch ALL messages for a session by paginating through all pages.
+ * Used on initial load to get the complete history.
+ */
+export async function getAllMessages(sessionId: string): Promise<MessageOut[]> {
+  const pageSize = 100;
+  let all: MessageOut[] = [];
+  let cursor: string | undefined;
+  while (true) {
+    const page = await getMessages(sessionId, pageSize, cursor);
+    all = all.concat(page);
+    if (page.length < pageSize) break; // last page
+    cursor = page[page.length - 1].id;
+  }
+  return all;
 }
 
 /**

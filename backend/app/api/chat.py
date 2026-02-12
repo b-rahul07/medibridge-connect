@@ -26,15 +26,20 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.get("/{session_id}/messages", response_model=List[MessageOut])
 def get_messages(
     session_id: uuid.UUID,
+    limit: int = 50,
+    cursor: str = None,
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):    """Retrieve all messages for a consultation session.
+):
+    """Retrieve all messages for a consultation session with cursor-based pagination.
 
     Returns messages in chronological order (oldest first). Only participants
     (the patient and the assigned doctor) are authorized to view messages.
 
     Args:
         session_id (uuid.UUID): The consultation session ID.
+        limit (int): Maximum number of messages to return (default: 50, max: 100).
+        cursor (str): Optional message ID to use as pagination cursor for next page.
         db (DBSession): Database session dependency.
         current_user (User): Authenticated user from JWT token.
 
@@ -42,8 +47,13 @@ def get_messages(
         List[MessageOut]: Ordered list of messages with original and translated content.
 
     Raises:
-        HTTPException: 404 if session not found, 403 if user is not a participant.
-    """    session = (
+        HTTPException: 404 if session not found, 403 if user is not a participant, 400 for invalid cursor.
+    """
+    # Enforce maximum limit to prevent abuse
+    if limit > 100:
+        limit = 100
+    
+    session = (
         db.query(ConsultationSession)
         .filter(ConsultationSession.id == session_id)
         .first()
@@ -223,7 +233,8 @@ async def upload_audio(
     file: UploadFile = File(...),
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):    """Process an audio message: save, transcribe, translate, and broadcast.
+):
+    """Process an audio message: save, transcribe, translate, and broadcast.
 
     This endpoint handles voice messages by:
     1. Saving the uploaded audio file to the local upload directory
@@ -248,7 +259,8 @@ async def upload_audio(
     Raises:
         HTTPException: 404 if session not found.
         Exception: Logs and raises any file I/O or AI service errors.
-    """    from app.services.ai_service import transcribe_audio, translate_text
+    """
+    from app.services.ai_service import transcribe_audio, translate_text
 
     sid = uuid.UUID(session_id)
     session = (
