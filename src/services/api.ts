@@ -254,7 +254,9 @@ let _socket: Socket | null = null;
 export function getSocket(): Socket {
   if (!_socket) {
     _socket = io(API_BASE || undefined, {
-      // Auth via httpOnly cookie (sent automatically with withCredentials)
+      // Send JWT token for auth (works cross-origin, unlike cookies)
+      auth: { token: getToken() },
+      // Also send cookies as fallback (same-origin / dev proxy)
       withCredentials: true,
       // Use polling first — avoids the "transport close" disconnect that
       // happens when WebSocket upgrade fails or races with the ASGI layer.
@@ -274,6 +276,10 @@ export function getSocket(): Socket {
     _socket.on('connect_error', (err) => console.error('[WS] Connect error:', err.message));
     _socket.on('disconnect', (reason) => {
       if (import.meta.env.DEV) console.log('[WS] Socket disconnected:', reason);
+      // Refresh token for reconnection attempt
+      if (_socket) {
+        _socket.auth = { token: getToken() };
+      }
     });
 
     if (import.meta.env.DEV) {

@@ -52,16 +52,28 @@ async def connect(sid, environ, auth=None):
         token = params.get("token", [None])[0]
 
     if not token:
-        # fallback to httpOnly cookie (ASGI scope headers)
+        # fallback to httpOnly cookie from request headers
         from http.cookies import SimpleCookie
 
+        # python-socketio passes ASGI scope as environ; headers are
+        # available both as raw tuples or via HTTP_ WSGI-style keys.
         raw_headers = environ.get("headers", [])
-        for name, value in raw_headers:
-            if name == b"cookie":
-                cookie = SimpleCookie(value.decode("utf-8", errors="ignore"))
+        if raw_headers:
+            for name, value in raw_headers:
+                hdr = name if isinstance(name, str) else name.decode("latin-1")
+                if hdr.lower() == "cookie":
+                    raw = value if isinstance(value, str) else value.decode("utf-8", errors="ignore")
+                    cookie = SimpleCookie(raw)
+                    if "auth_token" in cookie:
+                        token = cookie["auth_token"].value
+                    break
+        else:
+            # WSGI-style fallback (e.g. HTTP_COOKIE)
+            http_cookie = environ.get("HTTP_COOKIE", "")
+            if http_cookie:
+                cookie = SimpleCookie(http_cookie)
                 if "auth_token" in cookie:
                     token = cookie["auth_token"].value
-                break
 
     if not token:
         logger.warning("Connection rejected — no token (sid=%s)", sid)
