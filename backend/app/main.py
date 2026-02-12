@@ -171,6 +171,17 @@ def health():
     }
 
 
+@api.get("/health/translate-test")
+async def translate_test():
+    """Quick smoke test: translate 'hello' to Spanish via the AI service."""
+    from app.services.ai_service import translate_text
+    try:
+        result = await translate_text("hello", "es")
+        return {"status": "ok", "input": "hello", "target": "es", "output": result}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
 # ── AI endpoints (translate + summarize) ──────────────────────────────
 from app.schemas import TranslateRequest, TranslateResponse, SummarizeRequest, SummarizeResponse
 from app.services.ai_service import translate_text, summarize_conversation

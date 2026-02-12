@@ -381,34 +381,41 @@ const SessionChat = () => {
                   </div>
 
                   {/* Translation — shown BELOW the bubble, prominent */}
-                  {!message.audio_url && (
-                    <div
-                      className={`max-w-[80%] sm:max-w-[70%] mt-1.5 px-2 ${
-                        isMe ? 'text-right' : 'text-left'
-                      }`}
-                    >
-                      {message.translated_content ? (
-                        // Show translation only when it actually differs from original
+                  {!message.audio_url && (() => {
+                    if (message.translated_content) {
+                      // Show translation only when it actually differs from original
+                      if (
                         message.translated_content !== message.content &&
-                        !message.translated_content.startsWith('[') ? (
-                          <p className={`text-[14px] italic leading-relaxed ${
-                            isDoctor
-                              ? 'text-indigo-500 dark:text-indigo-400'
-                              : 'text-emerald-600 dark:text-emerald-400'
-                          }`}>
-                            {message.translated_content}
-                          </p>
-                        ) : null
-                      ) : (
+                        !message.translated_content.startsWith('[')
+                      ) {
+                        return (
+                          <div className={`max-w-[80%] sm:max-w-[70%] mt-1.5 px-2 ${isMe ? 'text-right' : 'text-left'}`}>
+                            <p className={`text-[14px] italic leading-relaxed ${
+                              isDoctor
+                                ? 'text-indigo-500 dark:text-indigo-400'
+                                : 'text-emerald-600 dark:text-emerald-400'
+                            }`}>
+                              {message.translated_content}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null; // same text or error — hide quietly
+                    }
+                    // No translated_content yet — show spinner only for recent messages (< 30s)
+                    const ageMs = Date.now() - new Date(message.created_at).getTime();
+                    if (ageMs > 30_000) return null; // too old, translation likely failed — hide
+                    return (
+                      <div className={`max-w-[80%] sm:max-w-[70%] mt-1.5 px-2 ${isMe ? 'text-right' : 'text-left'}`}>
                         <div className={`flex items-center gap-1.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/60" />
                           <span className="text-xs italic text-muted-foreground/60">
                             Translating...
                           </span>
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
