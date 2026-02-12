@@ -388,8 +388,14 @@ const SessionChat = () => {
                       }`}
                     >
                       {message.translated_content ? (
-                        // Only show translation if it's different from original content
-                        message.translated_content !== message.content ? (
+                        // Detect translation-failure markers from backend
+                        message.translated_content.startsWith('[Translation failed]') ||
+                        message.translated_content.startsWith('[Translation temporarily') ||
+                        message.translated_content.startsWith('[Mock Translation') ? (
+                          <p className="text-xs italic text-muted-foreground/50">
+                            Translation unavailable
+                          </p>
+                        ) : message.translated_content !== message.content ? (
                           <p className={`text-[14px] italic leading-relaxed ${
                             isDoctor
                               ? 'text-indigo-500 dark:text-indigo-400'

@@ -6,6 +6,7 @@ is empty the functions return deterministic mock values so the rest of
 the app can still be exercised without an API key.
 """
 
+import asyncio
 import logging
 from openai import AsyncOpenAI
 from app.core.config import settings
@@ -16,6 +17,8 @@ logger = logging.getLogger(__name__)
 _client = AsyncOpenAI(
     base_url=settings.AI_ENDPOINT,
     api_key=settings.GITHUB_TOKEN,
+    timeout=30.0,          # 30 s total timeout (default is 600 s)
+    max_retries=2,         # retry transient errors once
 )
 
 TRANSLATION_MODEL = "gpt-4o"
@@ -67,30 +70,48 @@ async def translate_text(text: str, target_language: str) -> str:
 
     lang_name = _resolve_language(target_language)
 
-    try:
-        logger.info("Translating to %s (%s): %s...", lang_name, target_language, text[:80])
-        response = await _client.chat.completions.create(
-            model=TRANSLATION_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        f"You are a medical translator. Your ONLY job is to translate text from one language into {lang_name}. "
-                        f"Do NOT reply, do NOT answer questions, do NOT explain. "
-                        f"Output ONLY the {lang_name} translation of the user's message, nothing else."
-                    ),
-                },
-                {"role": "user", "content": text},
-            ],
-            temperature=0.2,
-            max_tokens=2048,
-        )
-        translated = response.choices[0].message.content or text
-        logger.info("Translation result: %s...", translated[:80])
-        return translated.strip()
-    except Exception as e:
-        logger.exception("Translation failed")
-        return f"[Translation failed]: {text}"
+    last_err = None
+    for attempt in range(2):  # up to 2 attempts
+        try:
+            logger.info(
+                "Translating to %s (%s) [attempt %d]: %s...",
+                lang_name, target_language, attempt + 1, text[:80],
+            )
+            response = await asyncio.wait_for(
+                _client.chat.completions.create(
+                    model=TRANSLATION_MODEL,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                f"You are a medical translator. Your ONLY job is to translate text from one language into {lang_name}. "
+                                f"Do NOT reply, do NOT answer questions, do NOT explain. "
+                                f"Output ONLY the {lang_name} translation of the user's message, nothing else."
+                            ),
+                        },
+                        {"role": "user", "content": text},
+                    ],
+                    temperature=0.2,
+                    max_tokens=2048,
+                ),
+                timeout=25.0,  # hard async timeout per attempt
+            )
+            translated = response.choices[0].message.content or text
+            logger.info("Translation result: %s...", translated[:80])
+            return translated.strip()
+        except asyncio.TimeoutError:
+            logger.warning("Translation attempt %d timed out", attempt + 1)
+            last_err = "timeout"
+        except Exception as e:
+            logger.warning("Translation attempt %d failed: %s", attempt + 1, e)
+            last_err = str(e)
+
+        # brief pause before retry
+        if attempt == 0:
+            await asyncio.sleep(1)
+
+    logger.error("Translation failed after retries: %s", last_err)
+    return text  # return original text so the UI stays clean
 
 
 # ── Summarisation ─────────────────────────────────────────────────────

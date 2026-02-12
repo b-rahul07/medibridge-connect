@@ -249,8 +249,8 @@ async def send_message(sid, data):
             try:
                 translated = await translate_text(content, target_language)
             except Exception:
-                logger.exception("AI translation failed for %s — using fallback", msg_id)
-                translated = "[Translation temporarily unavailable]"
+                logger.exception("AI translation failed for %s — using original text", msg_id)
+                translated = content  # graceful fallback: show original text
 
         db = _get_db()
         try:
