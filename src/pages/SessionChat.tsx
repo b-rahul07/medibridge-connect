@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
 import { SUPPORTED_LANGUAGES } from '@/services/translator';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { summarizeSession, uploadAudio, API_BASE, getSession, endConsultation, SessionOut } from '@/services/api';
+import { summarizeSession, uploadAudio, API_BASE, getSession, endConsultation, updateSessionLanguage, SessionOut } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
 const SessionChat = () => {
@@ -20,14 +20,30 @@ const SessionChat = () => {
   const [sessionDetail, setSessionDetail] = useState<SessionOut | null>(null);
   const [newMessage, setNewMessage] = useState('');
 
-  // Single preferred language — stored per tab in sessionStorage
+  // Single preferred language — stored per-session in sessionStorage
+  const langKey = `medibridge_lang_${sessionId}`;
   const [myLanguage, setMyLanguage] = useState(() => {
-    return sessionStorage.getItem('medibridge_myLanguage') || 'en';
+    // Per-session language, falling back to global default preference
+    return sessionStorage.getItem(langKey)
+      || sessionStorage.getItem('medibridge_myLanguage')
+      || 'en';
   });
 
-  const handleMyLanguageChange = (lang: string) => {
+  const handleMyLanguageChange = async (lang: string) => {
     setMyLanguage(lang);
+    // Save per-session so it doesn't bleed to other chats
+    sessionStorage.setItem(langKey, lang);
+    // Also update global default for new sessions
     sessionStorage.setItem('medibridge_myLanguage', lang);
+    // Immediately update the backend session record so translation
+    // targets the correct language even before the user sends a message
+    if (sessionId) {
+      try {
+        await updateSessionLanguage(sessionId, lang);
+      } catch (err) {
+        console.error('Failed to update language on server:', err);
+      }
+    }
   };
   const [isSending, setIsSending] = useState(false);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
@@ -41,7 +57,19 @@ const SessionChat = () => {
   useEffect(() => {
     if (!sessionId) return;
     getSession(sessionId)
-      .then(setSessionDetail)
+      .then((detail) => {
+        setSessionDetail(detail);
+        // Sync language from server session record if available, and no
+        // per-session override has been set yet by the user.
+        if (!sessionStorage.getItem(langKey) && user) {
+          const serverLang =
+            user.role === 'patient' ? detail.patient_language : detail.doctor_language;
+          if (serverLang) {
+            setMyLanguage(serverLang);
+            sessionStorage.setItem(langKey, serverLang);
+          }
+        }
+      })
       .catch((err) => console.error('Failed to load session detail:', err));
   }, [sessionId]);
 

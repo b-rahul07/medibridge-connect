@@ -78,6 +78,10 @@ class SessionOut(BaseModel):
         from_attributes = True
 
 
+class SessionLanguageUpdateRequest(BaseModel):
+    language: str
+
+
 class SessionEndRequest(BaseModel):
     summary: Optional[str] = None
 

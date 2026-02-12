@@ -14,6 +14,7 @@ from app.schemas import (
     SessionCreateRequest,
     SessionAcceptRequest,
     SessionEndRequest,
+    SessionLanguageUpdateRequest,
     SessionOut,
     MessageOut,
 )
@@ -79,6 +80,32 @@ def accept_consultation(
     session.doctor_id = current_user.id
     session.doctor_language = body.doctor_language
     session.status = "active"
+    db.commit()
+    return _load_session(db, session.id)
+
+
+# ── Update preferred language for current user in a session ──────────
+@router.put("/{session_id}/language", response_model=SessionOut)
+def update_session_language(
+    session_id: UUID,
+    body: SessionLanguageUpdateRequest,
+    db: DBSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = (
+        db.query(ConsultationSession)
+        .filter(ConsultationSession.id == session_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.patient_id != current_user.id and session.doctor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not a participant of this session")
+
+    if session.patient_id == current_user.id:
+        session.patient_language = body.language
+    else:
+        session.doctor_language = body.language
     db.commit()
     return _load_session(db, session.id)
 
