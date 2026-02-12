@@ -388,14 +388,9 @@ const SessionChat = () => {
                       }`}
                     >
                       {message.translated_content ? (
-                        // Detect translation-failure markers from backend
-                        message.translated_content.startsWith('[Translation failed]') ||
-                        message.translated_content.startsWith('[Translation temporarily') ||
-                        message.translated_content.startsWith('[Mock Translation') ? (
-                          <p className="text-xs italic text-muted-foreground/50">
-                            Translation unavailable
-                          </p>
-                        ) : message.translated_content !== message.content ? (
+                        // Show translation only when it actually differs from original
+                        message.translated_content !== message.content &&
+                        !message.translated_content.startsWith('[') ? (
                           <p className={`text-[14px] italic leading-relaxed ${
                             isDoctor
                               ? 'text-indigo-500 dark:text-indigo-400'
@@ -403,11 +398,7 @@ const SessionChat = () => {
                           }`}>
                             {message.translated_content}
                           </p>
-                        ) : (
-                          <p className="text-xs italic text-muted-foreground/50">
-                            No translation needed
-                          </p>
-                        )
+                        ) : null
                       ) : (
                         <div className={`flex items-center gap-1.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/60" />

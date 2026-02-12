@@ -21,7 +21,7 @@ _client = AsyncOpenAI(
     max_retries=2,         # retry transient errors once
 )
 
-TRANSLATION_MODEL = "gpt-4o"
+TRANSLATION_MODEL = "gpt-4o-mini"
 WHISPER_MODEL = "whisper-large-v3-turbo"
 
 # ── language code → full name mapping ─────────────────────────────────
@@ -65,21 +65,22 @@ async def translate_text(text: str, target_language: str) -> str:
         Exception: Logs and catches all exceptions, returning fallback text.
     """
     if not settings.GITHUB_TOKEN:
-        logger.warning("No GITHUB_TOKEN — returning mock translation")
-        return f"[Mock Translation to {target_language}]: {text}"
+        logger.warning("No GITHUB_TOKEN — translation unavailable, returning original text")
+        return text
 
     lang_name = _resolve_language(target_language)
 
     last_err = None
-    for attempt in range(2):  # up to 2 attempts
+    models_to_try = [TRANSLATION_MODEL, "gpt-4o"]  # fallback to heavier model
+    for attempt, model in enumerate(models_to_try):
         try:
             logger.info(
-                "Translating to %s (%s) [attempt %d]: %s...",
-                lang_name, target_language, attempt + 1, text[:80],
+                "Translating to %s (%s) [attempt %d, model %s]: %s...",
+                lang_name, target_language, attempt + 1, model, text[:80],
             )
             response = await asyncio.wait_for(
                 _client.chat.completions.create(
-                    model=TRANSLATION_MODEL,
+                    model=model,
                     messages=[
                         {
                             "role": "system",
@@ -92,9 +93,9 @@ async def translate_text(text: str, target_language: str) -> str:
                         {"role": "user", "content": text},
                     ],
                     temperature=0.2,
-                    max_tokens=2048,
+                    max_tokens=512,
                 ),
-                timeout=25.0,  # hard async timeout per attempt
+                timeout=20.0,  # hard async timeout per attempt
             )
             translated = response.choices[0].message.content or text
             logger.info("Translation result: %s...", translated[:80])
