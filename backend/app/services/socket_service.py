@@ -39,7 +39,7 @@ def _get_db() -> DBSession:
 # ── connection lifecycle ──────────────────────────────────────────────
 @sio.event
 async def connect(sid, environ, auth=None):
-    """Authenticate on connect. Clients must send { token: "..." } as auth."""
+    """Authenticate on connect via auth payload, query-string, or httpOnly cookie."""
     token = None
     if auth and isinstance(auth, dict):
         token = auth.get("token")
@@ -50,6 +50,18 @@ async def connect(sid, environ, auth=None):
         qs = environ.get("QUERY_STRING", "")
         params = parse_qs(qs)
         token = params.get("token", [None])[0]
+
+    if not token:
+        # fallback to httpOnly cookie (ASGI scope headers)
+        from http.cookies import SimpleCookie
+
+        raw_headers = environ.get("headers", [])
+        for name, value in raw_headers:
+            if name == b"cookie":
+                cookie = SimpleCookie(value.decode("utf-8", errors="ignore"))
+                if "auth_token" in cookie:
+                    token = cookie["auth_token"].value
+                break
 
     if not token:
         logger.warning("Connection rejected — no token (sid=%s)", sid)

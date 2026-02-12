@@ -3,7 +3,9 @@
  * Replaces all direct Supabase calls.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// In development the Vite dev-server proxies API routes to the backend,
+// so API_BASE should be '' (same origin).  In production, set VITE_API_URL.
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 // ── token helpers ─────────────────────────────────────────────────────
 export function getToken(): string | null {
@@ -40,6 +42,7 @@ async function request<T>(
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   if (!res.ok) {
@@ -243,9 +246,9 @@ let _socket: Socket | null = null;
  */
 export function getSocket(): Socket {
   if (!_socket) {
-    const token = getToken();
-    _socket = io(API_BASE.replace(/\/+$/, ''), {
-      auth: { token },
+    _socket = io(API_BASE || undefined, {
+      // Auth via httpOnly cookie (sent automatically with withCredentials)
+      withCredentials: true,
       // Use polling first — avoids the "transport close" disconnect that
       // happens when WebSocket upgrade fails or races with the ASGI layer.
       // Socket.IO will automatically upgrade to WebSocket after the
@@ -264,9 +267,6 @@ export function getSocket(): Socket {
     _socket.on('connect_error', (err) => console.error('[WS] Connect error:', err.message));
     _socket.on('disconnect', (reason) => {
       if (import.meta.env.DEV) console.log('[WS] Socket disconnected:', reason);
-      if (_socket) {
-        _socket.auth = { token: getToken() };
-      }
     });
 
     if (import.meta.env.DEV) {
