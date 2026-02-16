@@ -165,6 +165,15 @@ export async function endConsultation(
     body: JSON.stringify({ summary }),
   });
 }
+export async function updateSessionLanguage(
+  session_id: string,
+  language: string,
+): Promise<SessionOut> {
+  return request<SessionOut>(`/consultations/${session_id}/language`, {
+    method: 'PATCH',
+    body: JSON.stringify({ language }),
+  });
+}
 
 export async function listSessions(
   statusFilter?: string,

@@ -61,6 +61,10 @@ class SessionAcceptRequest(BaseModel):
     doctor_language: Optional[str] = None
 
 
+class SessionLanguageUpdate(BaseModel):
+    language: str
+
+
 class SessionOut(BaseModel):
     id: uuid.UUID
     patient_id: uuid.UUID
