@@ -8,7 +8,7 @@ import os
 import uuid
 from typing import List
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session as DBSession
 
 from app.core.database import get_db, SessionLocal
@@ -92,42 +92,31 @@ async def _translate_and_broadcast(
     target_language: str,
     room: str,
 ):
-    """Phase 2: translate text and broadcast 'message_updated' event.
-
-    Designed to be called both as a BackgroundTask and directly.
-    Contains full error handling so it never raises.
-    """
+    """Phase 2: translate text and broadcast 'message_updated' event."""
     from app.services.ai_service import translate_text
     from app.services.socket_service import sio
 
     try:
         translated = await translate_text(content, target_language)
-        logger.info("Translation completed for %s: %s...", msg_id, translated[:60])
     except Exception:
-        logger.exception("AI translation failed for %s — using original text", msg_id)
-        translated = content  # graceful fallback: show original text
+        logger.exception("AI translation failed for %s — using fallback", msg_id)
+        translated = "[Translation temporarily unavailable]"
 
+    db = SessionLocal()
     try:
-        db = SessionLocal()
-        try:
-            row = db.query(Message).filter(Message.id == uuid.UUID(msg_id)).first()
-            if row:
-                row.translated_content = translated
-                db.commit()
-        finally:
-            db.close()
-    except Exception:
-        logger.exception("DB save failed for translation %s", msg_id)
+        row = db.query(Message).filter(Message.id == uuid.UUID(msg_id)).first()
+        if row:
+            row.translated_content = translated
+            db.commit()
+    finally:
+        db.close()
 
-    try:
-        await sio.emit(
-            "message_updated",
-            {"id": msg_id, "translated_content": translated},
-            room=room,
-        )
-        logger.info("REST send — translation broadcast for %s", msg_id)
-    except Exception:
-        logger.exception("Socket.IO emit failed for %s", msg_id)
+    await sio.emit(
+        "message_updated",
+        {"id": msg_id, "translated_content": translated},
+        room=room,
+    )
+    logger.info("REST send — translation broadcast for %s", msg_id)
 
 
 # ── Send a text message (REST — reliable fallback) ───────────────────
@@ -135,7 +124,6 @@ async def _translate_and_broadcast(
 async def send_message_rest(
     session_id: uuid.UUID,
     body: SendMessageRequest,
-    background_tasks: BackgroundTasks,
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -230,8 +218,8 @@ async def send_message_rest(
             db_session.close()
         await sio.emit("message_updated", {"id": msg_id, "translated_content": body.content}, room=room)
     else:
-        background_tasks.add_task(
-            _translate_and_broadcast, msg_id, body.content, target_language, room
+        asyncio.create_task(
+            _translate_and_broadcast(msg_id, body.content, target_language, room)
         )
 
     return MessageOut.model_validate(message)

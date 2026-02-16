@@ -177,16 +177,6 @@ export async function getSession(sessionId: string): Promise<SessionOut> {
   return request<SessionOut>(`/consultations/${sessionId}`);
 }
 
-export async function updateSessionLanguage(
-  sessionId: string,
-  language: string,
-): Promise<SessionOut> {
-  return request<SessionOut>(`/consultations/${sessionId}/language`, {
-    method: 'PUT',
-    body: JSON.stringify({ language }),
-  });
-}
-
 export async function searchMessagesDetail(query: string): Promise<MessageOut[]> {
   return request<MessageOut[]>(
     `/consultations/search/messages/detail?q=${encodeURIComponent(query)}`,
