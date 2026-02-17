@@ -12,6 +12,7 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'ar', name: 'Arabic' },
   { code: 'pt', name: 'Portuguese' },
   { code: 'ru', name: 'Russian' },
+  { code: 'te', name: 'Telugu' },
 ];
 
 /**

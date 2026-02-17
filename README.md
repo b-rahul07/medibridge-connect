@@ -19,6 +19,15 @@ MediBridge is a real-time medical consultation platform designed to bridge the g
 
 ## ⚡ Recent Production-Ready Improvements
 
+### 🌐 **Telugu Language Support**
+Added Telugu (`te`) as the 11th supported language for real-time medical translation, bringing the full list to: English, Spanish, Hindi, French, German, Chinese, Japanese, Arabic, Portuguese, Russian, and Telugu.
+
+### 🛡️ **Translation Prompt Hardening**
+Improved AI translation prompt to prevent GPT-4o from refusing to translate messages that resemble hostile/inappropriate text (e.g., "what is your problem"). The model now treats all input strictly as medical consultation text to be translated literally, using triple-backtick delimiters and explicit instructions to never refuse or reply.
+
+### 🔧 **Backend .env Path Fix**
+Fixed a critical bug where the backend `config.py` failed to load the `.env` file due to incorrect path resolution (`Path(__file__).parent.parent` → `Path(__file__).parent.parent.parent`). This caused local development to fall back to default placeholder credentials, breaking database connectivity and sign-in.
+
 ### 🔒 **Security Enhancement: httpOnly Cookies**
 JWT tokens now stored in `httpOnly` cookies instead of JavaScript-accessible storage, preventing XSS token theft attacks. Includes automatic CSRF protection via `SameSite=Lax` policy and dual authentication support (cookie-first with Bearer fallback for Socket.IO).
 
@@ -43,6 +52,9 @@ The three features above introduced several cross-cutting issues that were ident
 | **Backend crash on startup** | Python docstring syntax error | Fixed docstring formatting in `chat.py` |
 | **Missing messages** | Frontend called `getMessages()` once without pagination params | Added `getAllMessages()` that auto-paginates through all pages on initial chat load |
 
+| **Backend .env not loading** | `config.py` path resolution off by one directory level | Fixed `Path(__file__).parent.parent` → `.parent.parent.parent` to correctly locate `backend/.env` |
+| **AI refusing to translate** | GPT-4o interpreted user messages (e.g., "what is your problem") as hostile questions directed at itself | Hardened prompt with triple-backtick delimiters and explicit "never refuse" instructions |
+
 </details>
 
 ---
@@ -50,7 +62,7 @@ The three features above introduced several cross-cutting issues that were ident
 ## 🚀 Features
 
 ### **1. Real-time Multilingual Chat**
-*   **Instant Translation:** Powered by **GPT-4o**, messages are translated instantly between the patient's and doctor's preferred languages.
+*   **Instant Translation:** Powered by **GPT-4o**, messages are translated instantly between the patient's and doctor's preferred languages. Supports 11 languages including English, Spanish, Hindi, French, German, Chinese, Japanese, Arabic, Portuguese, Russian, and Telugu.
 *   **Zero-Lag Architecture:** Uses an optimistic UI update pattern to show messages immediately while AI processing happens in the background.
 *   **Two-Phase Broadcast:** Original message appears instantly (Phase 1), translation follows within 1-3 seconds (Phase 2) via Socket.IO updates.
 
@@ -111,9 +123,8 @@ cp .env.example .env
 # Run database schema
 psql -U postgres -d medibridge -f schema.sql
 
-# Start Server (from project root)
-cd ..
-PYTHONPATH=backend uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Start Server (from backend directory)
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 3. Frontend Setup

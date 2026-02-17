@@ -14,6 +14,7 @@ const SUPPORTED_LANGUAGES = [
   { code: 'ar', name: 'Arabic' },
   { code: 'pt', name: 'Portuguese' },
   { code: 'ru', name: 'Russian' },
+  { code: 'te', name: 'Telugu' },
 ];
 
 describe("cn utility", () => {
@@ -32,8 +33,8 @@ describe("cn utility", () => {
 });
 
 describe("supported languages", () => {
-  it("contains 10 languages", () => {
-    expect(SUPPORTED_LANGUAGES).toHaveLength(10);
+  it("contains 11 languages", () => {
+    expect(SUPPORTED_LANGUAGES).toHaveLength(11);
   });
 
   it("includes English and Hindi", () => {

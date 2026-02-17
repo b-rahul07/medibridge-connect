@@ -12,8 +12,9 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-# Load .env from the backend directory (parent of this file's directory)
-_backend_dir = Path(__file__).resolve().parent.parent
+# Load .env from the backend directory
+# __file__ = backend/app/core/config.py → .parent.parent.parent = backend/
+_backend_dir = Path(__file__).resolve().parent.parent.parent
 load_dotenv(_backend_dir / ".env")
 
 
