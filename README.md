@@ -9,6 +9,10 @@
 
 MediBridge is a real-time medical consultation platform designed to bridge the gap between doctors and patients who speak different languages. It features instant two-way translation, voice-to-text transcription, and secure, low-latency communication.
 
+## 🎬 Demo
+
+https://github.com/b-rahul07/medibridge-connect/raw/main/Medibridge.mp4
+
 > **Live Demo:** [https://medibridge-connect.vercel.app](https://medibridge-connect.vercel.app)
 >
 > **Backend API:** [https://medibridge-api-r6ea.onrender.com/health](https://medibridge-api-r6ea.onrender.com/health)
