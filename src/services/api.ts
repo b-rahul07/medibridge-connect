@@ -133,7 +133,7 @@ export function signOut(): void {
   fetch(`${API_BASE}/auth/logout`, {
     method: 'POST',
     credentials: 'include',
-  }).catch(() => {/* ignore errors */});
+  }).catch(() => {/* ignore errors */ });
 }
 
 // ── consultations ─────────────────────────────────────────────────────
@@ -287,7 +287,15 @@ let _socket: Socket | null = null;
  */
 export function getSocket(): Socket {
   if (!_socket) {
-    _socket = io(API_BASE || undefined, {
+    // Phase 3 — Enforce secure WebSockets (wss://) in production.
+    // Socket.IO's io() accepts an HTTP/HTTPS URL and handles the WS upgrade
+    // internally, so we map https:// → wss:// and http:// → ws://.
+    // In dev (no API_BASE), pass undefined so Vite's proxy handles routing.
+    const wsBase = API_BASE
+      ? API_BASE.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
+      : undefined;
+
+    _socket = io(wsBase, {
       // Send JWT token for auth (works cross-origin, unlike cookies)
       auth: { token: getToken() },
       // Also send cookies as fallback (same-origin / dev proxy)

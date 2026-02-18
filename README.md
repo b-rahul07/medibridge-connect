@@ -37,6 +37,49 @@ Audio files now persist to Cloudinary with CDN delivery, solving ephemeral files
 ### 📊 **Scalability: Cursor-Based Pagination**
 Message endpoints now support `?limit=50&cursor={message_id}` pagination (max 100), preventing browser crashes with long conversations. Handles 10,000+ message sessions efficiently with sub-20ms query times.
 
+### 🧪 **Phase 2: Automated Security Test Suite (16/16 Passing)**
+Built a comprehensive `pytest` suite covering authentication, security hardening, and input validation — all running against an isolated SQLite test database with zero production dependencies.
+
+| Test Category | Tests | Coverage |
+|:---|:---|:---|
+| **Auth Flow** | 8 tests | Signup, login, `/me`, logout, duplicate email, wrong password |
+| **Security** | 5 tests | Rate limiting (100 req/min), XSS body scan, SQL injection, CORS, security headers |
+| **Input Validation** | 3 tests | Password rules (length, repeated chars), name sanitization, httpOnly cookies |
+
+**Infrastructure built:**
+- `conftest.py` — shared fixtures: SQLite test engine, `TestClient` with `get_db` override, autouse rate-limit reset, per-test user cleanup
+- Correctly wires `dependency_overrides` to the inner FastAPI `api` instance (not the `socketio.ASGIApp` wrapper)
+
+```bash
+# Run the full suite
+cmd /c ".venv\Scripts\python.exe -m pytest backend\tests\test_auth_security.py -v --tb=short"
+# Result: 16 passed in 3.91s ✅
+```
+
+### 🗄️ **Phase 3: SQLAlchemy Connection Pooling**
+Replaced the default unbounded engine with a production-tuned pool, preventing connection exhaustion under concurrent load on Render's free PostgreSQL tier (~10 max connections).
+
+```python
+engine = create_engine(
+    _db_url,
+    pool_pre_ping=True,   # Recycle stale connections before use
+    pool_size=5,          # Persistent connections in pool
+    max_overflow=10,      # Extra connections under burst load
+    pool_timeout=30,      # Wait limit before raising OperationalError
+    pool_recycle=1800,    # Refresh every 30 min (avoids idle-timeout drops)
+)
+```
+
+### 🔐 **Phase 3: Secure WebSocket Enforcement (wss://)**
+Socket.IO client now automatically derives `wss://` from `VITE_API_URL` in production, ensuring all real-time traffic is encrypted. Dev proxy is unaffected.
+
+```typescript
+// https://api.onrender.com → wss://api.onrender.com (automatic)
+const wsBase = API_BASE
+  ? API_BASE.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
+  : undefined;
+```
+
 <details>
 <summary><strong>🐛 Bug Fixes Applied During Implementation (Click to expand)</strong></summary>
 
@@ -56,6 +99,7 @@ The three features above introduced several cross-cutting issues that were ident
 | **AI refusing to translate** | GPT-4o interpreted user messages (e.g., "what is your problem") as hostile questions directed at itself | Hardened prompt with triple-backtick delimiters and explicit "never refuse" instructions |
 
 </details>
+
 
 ---
 
