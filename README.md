@@ -1,241 +1,243 @@
 # MediBridge Connect 🏥
-**Breaking Language Barriers in Healthcare with Real-time AI.**
+### Breaking Language Barriers in Healthcare with Real-Time AI
 
 ![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
+![Socket.io](https://img.shields.io/badge/Socket.io-black?style=for-the-badge&logo=socket.io&badgeColor=010101)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
-MediBridge is a real-time medical consultation platform designed to bridge the gap between doctors and patients who speak different languages. It features instant two-way translation, voice-to-text transcription, and secure, low-latency communication.
+A production-deployed, full-stack platform enabling real-time multilingual medical consultations between doctors and patients. Features live two-way AI translation, cross-language voice transcription, and on-demand clinical note generation — all over an encrypted WebSocket channel.
+
+> 🌐 **Live Demo:** [https://medibridge-connect.vercel.app](https://medibridge-connect.vercel.app)
+>
+> 🔗 **Backend Health:** [https://medibridge-api-r6ea.onrender.com/health](https://medibridge-api-r6ea.onrender.com/health)
+>
+> 📂 **GitHub:** [https://github.com/b-rahul07/medibridge-connect](https://github.com/b-rahul07/medibridge-connect)
+
+---
 
 ## 🎬 Demo
 
-https://github.com/b-rahul07/medibridge-connect/raw/main/Medibridge.mp4
-
-> **Live Demo:** [https://medibridge-connect.vercel.app](https://medibridge-connect.vercel.app)
->
-> **Backend API:** [https://medibridge-api-r6ea.onrender.com/health](https://medibridge-api-r6ea.onrender.com/health)
->
-> **GitHub:** [https://github.com/b-rahul07/medibridge-connect](https://github.com/b-rahul07/medibridge-connect)
+<video src="https://github.com/b-rahul07/medibridge-connect/raw/main/Medibridge.mp4" controls width="100%"></video>
 
 ---
 
-## ⚡ Recent Production-Ready Improvements
+## ✨ Core Features
 
-### 🌐 **Telugu Language Support**
-Added Telugu (`te`) as the 11th supported language for real-time medical translation, bringing the full list to: English, Spanish, Hindi, French, German, Chinese, Japanese, Arabic, Portuguese, Russian, and Telugu.
+### 1. Real-Time Multilingual Chat
+- **Instant AI Translation** via **GPT-4o** across **11 languages**: English, Spanish, Hindi, French, German, Chinese, Japanese, Arabic, Portuguese, Russian, and Telugu
+- **Two-Phase Broadcast** pattern masks the 1–3s LLM latency: the original message appears instantly (Phase 1) while the translation arrives via a Socket.IO `message_updated` event (Phase 2)
+- **Optimistic UI** — messages render immediately on send, with translation filling in asynchronously
 
-### 🛡️ **Translation Prompt Hardening**
-Improved AI translation prompt to prevent GPT-4o from refusing to translate messages that resemble hostile/inappropriate text (e.g., "what is your problem"). The model now treats all input strictly as medical consultation text to be translated literally, using triple-backtick delimiters and explicit instructions to never refuse or reply.
+### 2. Cross-Language Voice Transcription
+- Voice notes recorded in the browser are uploaded to **Cloudinary** (persistent CDN storage, solving Render's ephemeral filesystem)
+- Transcribed by **OpenAI Whisper (large-v3-turbo)** and then translated — a doctor can *read* a patient's spoken Spanish as English text in real time
+- Automatic temp file cleanup post-transcription
 
-### 🔧 **Backend .env Path Fix**
-Fixed a critical bug where the backend `config.py` failed to load the `.env` file due to incorrect path resolution (`Path(__file__).parent.parent` → `Path(__file__).parent.parent.parent`). This caused local development to fall back to default placeholder credentials, breaking database connectivity and sign-in.
+### 3. On-Demand AI Clinical Scribe
+- At consultation end, **GPT-4o** generates a structured clinical note: **Symptoms → Diagnosis → Treatment Plan**
+- Prompt-engineered with medical context and triple-backtick delimiters to prevent refusal on ambiguous phrasing
+- Stored in PostgreSQL alongside the full message history
 
-### 🔒 **Security Enhancement: httpOnly Cookies**
-JWT tokens now stored in `httpOnly` cookies instead of JavaScript-accessible storage, preventing XSS token theft attacks. Includes automatic CSRF protection via `SameSite=Lax` policy and dual authentication support (cookie-first with Bearer fallback for Socket.IO).
+---
 
-### ☁️ **Cloud Storage: Cloudinary Integration**
-Audio files now persist to Cloudinary with CDN delivery, solving ephemeral filesystem issues on Render/Vercel. Includes graceful local storage fallback and automatic temp file cleanup after transcription.
+## 🏗️ System Architecture
 
-### 📊 **Scalability: Cursor-Based Pagination**
-Message endpoints now support `?limit=50&cursor={message_id}` pagination (max 100), preventing browser crashes with long conversations. Handles 10,000+ message sessions efficiently with sub-20ms query times.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Browser (React 18 + Vite)                    │
+│                                                                 │
+│   React Router · TanStack Query · socket.io-client · shadcn/ui │
+└──────────────────────┬──────────────────────┬───────────────────┘
+                       │   HTTPS REST API     │  WSS (Socket.IO)
+                       │   /auth /chat        │  message_send
+                       │   /consultations     │  message_updated
+                       ▼                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              FastAPI + python-socketio (ASGI on Render)         │
+│                                                                 │
+│  ┌──────────────┐  ┌───────────────┐  ┌──────────────────────┐ │
+│  │  Auth Router │  │  Chat Router  │  │  Consultation Router │ │
+│  │  /auth/*     │  │  /chat/*      │  │  /consultations/*    │ │
+│  └──────┬───────┘  └──────┬────────┘  └──────────┬───────────┘ │
+│         │                 │                       │             │
+│  ┌──────▼─────────────────▼───────────────────────▼──────────┐ │
+│  │                   Core Services                            │ │
+│  │  JWT (httpOnly cookie) · BCrypt · Rate Limiter · CSP/XSS  │ │
+│  └──────────────────────────────┬─────────────────────────────┘ │
+└─────────────────────────────────┼───────────────────────────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              ▼                   ▼                   ▼
+┌─────────────────────┐  ┌───────────────┐  ┌────────────────────┐
+│     PostgreSQL      │  │    OpenAI     │  │     Cloudinary     │
+│  (Render managed)   │  │  GPT-4o       │  │  Audio CDN storage │
+│  users · sessions   │  │  Whisper      │  │  (persistent files │
+│  messages           │  │  (via GitHub  │  │   across deploys)  │
+│  SQLAlchemy pool    │  │   Models API) │  └────────────────────┘
+└─────────────────────┘  └───────────────┘
+```
 
-### 🧪 **Phase 2: Automated Security Test Suite (16/16 Passing)**
-Built a comprehensive `pytest` suite covering authentication, security hardening, and input validation — all running against an isolated SQLite test database with zero production dependencies.
+### Key Design Decisions
 
-| Test Category | Tests | Coverage |
-|:---|:---|:---|
-| **Auth Flow** | 8 tests | Signup, login, `/me`, logout, duplicate email, wrong password |
-| **Security** | 5 tests | Rate limiting (100 req/min), XSS body scan, SQL injection, CORS, security headers |
-| **Input Validation** | 3 tests | Password rules (length, repeated chars), name sanitization, httpOnly cookies |
+| Decision | Rationale |
+|:---|:---|
+| **FastAPI over Node.js** | Native async support + Python's OpenAI SDK; background tasks for non-blocking AI calls |
+| **REST + Socket.IO hybrid** | REST for transactional reliability (auth, session creation); Socket.IO for sub-100ms real-time updates |
+| **Two-Phase Broadcast** | Decouples message delivery from GPT-4o processing, masking 1–3s LLM latency entirely |
+| **httpOnly cookies over localStorage** | Eliminates XSS token theft; `SameSite=None; Secure` auto-detected in production |
+| **Cloudinary for audio** | Render's ephemeral filesystem loses files on redeploy; Cloudinary provides persistent CDN URLs |
 
-**Infrastructure built:**
-- `conftest.py` — shared fixtures: SQLite test engine, `TestClient` with `get_db` override, autouse rate-limit reset, per-test user cleanup
-- Correctly wires `dependency_overrides` to the inner FastAPI `api` instance (not the `socketio.ASGIApp` wrapper)
+---
+
+## ⚙️ Enterprise Engineering & Security
+
+### 🔐 Authentication & Security Hardening
+
+- **JWT in `httpOnly` cookies** — tokens are inaccessible to JavaScript, eliminating XSS token theft
+- **`SameSite=None; Secure`** auto-detected in production (CORS origins contain `https://`); `SameSite=Lax` in dev
+- **Custom ASGI middleware** enforces: rate limiting (100 req/min/IP), XSS body scanning, and security headers (`X-Frame-Options: DENY`, `Content-Security-Policy`, `X-Content-Type-Options: nosniff`)
+- **Encrypted WebSockets** — `getSocket()` in `api.ts` automatically derives `wss://` from `VITE_API_URL` in production:
+  ```typescript
+  const wsBase = API_BASE
+    ? API_BASE.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
+    : undefined;
+  ```
+
+### 🗄️ Database & Scalability
+
+- **SQLAlchemy connection pooling** — tuned for Render's free PostgreSQL tier (~10 max connections):
+  ```python
+  engine = create_engine(
+      DATABASE_URL,
+      pool_pre_ping=True,   # Recycle stale connections before use
+      pool_size=5,          # Persistent connections in pool
+      max_overflow=10,      # Burst capacity under load
+      pool_timeout=30,      # Raises OperationalError instead of hanging
+      pool_recycle=1800,    # Refresh every 30 min (avoids idle-timeout drops)
+  )
+  ```
+- **Cursor-based pagination** on `/chat/messages?limit=50&cursor={id}` — handles 10,000+ message sessions with sub-20ms query times; prevents browser OOM on long consultations
+
+### 🧪 Automated Testing — 16/16 Passing
+
+A comprehensive `pytest` suite runs against an **isolated SQLite test database** with zero production dependencies:
+
+| Category | Tests | What's Verified |
+|:---|:---:|:---|
+| **Auth Flow** | 8 | Signup (201), login, `/me`, logout, duplicate email (409), wrong password (401) |
+| **Security** | 5 | Rate limiting (100 req/min), XSS body scan (400), SQL injection (422), CORS, security headers |
+| **Input Validation** | 3 | Password rules, name sanitization, `httpOnly` cookie presence |
+
+**Infrastructure highlights:**
+- `conftest.py` wires `dependency_overrides` to the inner FastAPI `api` instance (not the `socketio.ASGIApp` wrapper — a non-obvious distinction)
+- `autouse` fixtures: `clean_users` (per-test DB wipe) and `reset_rate_limit` (clears the in-memory `defaultdict` to prevent test pollution)
+- Windows-safe SQLite teardown via `engine.dispose()` before file deletion
 
 ```bash
-# Run the full suite
-cmd /c ".venv\Scripts\python.exe -m pytest backend\tests\test_auth_security.py -v --tb=short"
-# Result: 16 passed in 3.91s ✅
+# Run from project root
+.venv\Scripts\python.exe -m pytest backend\tests\test_auth_security.py -v --tb=short
+# ✅ 16 passed in 3.91s
 ```
-
-### 🗄️ **Phase 3: SQLAlchemy Connection Pooling**
-Replaced the default unbounded engine with a production-tuned pool, preventing connection exhaustion under concurrent load on Render's free PostgreSQL tier (~10 max connections).
-
-```python
-engine = create_engine(
-    _db_url,
-    pool_pre_ping=True,   # Recycle stale connections before use
-    pool_size=5,          # Persistent connections in pool
-    max_overflow=10,      # Extra connections under burst load
-    pool_timeout=30,      # Wait limit before raising OperationalError
-    pool_recycle=1800,    # Refresh every 30 min (avoids idle-timeout drops)
-)
-```
-
-### 🔐 **Phase 3: Secure WebSocket Enforcement (wss://)**
-Socket.IO client now automatically derives `wss://` from `VITE_API_URL` in production, ensuring all real-time traffic is encrypted. Dev proxy is unaffected.
-
-```typescript
-// https://api.onrender.com → wss://api.onrender.com (automatic)
-const wsBase = API_BASE
-  ? API_BASE.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
-  : undefined;
-```
-
-<details>
-<summary><strong>🐛 Bug Fixes Applied During Implementation (Click to expand)</strong></summary>
-
-The three features above introduced several cross-cutting issues that were identified and resolved:
-
-| Bug | Root Cause | Fix |
-|-----|-----------|-----|
-| **Sign-in not working (local dev)** | `fetch()` wrapper missing credentials: 'include' — browser silently dropped the Set-Cookie header | Added `credentials: 'include'` to the generic `request()` wrapper in `api.ts` |
-| **Sign-in not working (cross-origin)** | Frontend (Vercel) and backend (Render) are different origins — SameSite=Lax cookies are never sent cross-origin | Added Vite dev proxy for same-origin requests in dev; returned JWT in response body for production `sessionStorage` fallback |
-| **Socket.IO "Reconnecting..." loop** | Socket.IO client had `auth: { token }` removed during migration | Restored `auth: { token: getToken() }` on client; added fallback parsing on backend |
-| **"Translating..." stuck forever** | Socket.IO unable to connect meant `message_updated` events never arrived | Fixed via Socket.IO connection resolution; restored two-phase broadcast pattern |
-| **Cookie Secure flag mismatch** | `secure=False` cookies rejected by browsers on HTTPS sites | Auto-detect production via CORS origins to set `SameSite=None; Secure` automatically |
-| **Backend crash on startup** | Python docstring syntax error | Fixed docstring formatting in `chat.py` |
-| **Missing messages** | Frontend called `getMessages()` once without pagination params | Added `getAllMessages()` that auto-paginates through all pages on initial chat load |
-
-| **Backend .env not loading** | `config.py` path resolution off by one directory level | Fixed `Path(__file__).parent.parent` → `.parent.parent.parent` to correctly locate `backend/.env` |
-| **AI refusing to translate** | GPT-4o interpreted user messages (e.g., "what is your problem") as hostile questions directed at itself | Hardened prompt with triple-backtick delimiters and explicit "never refuse" instructions |
-
-</details>
-
-
----
-
-## 🚀 Features
-
-### **1. Real-time Multilingual Chat**
-*   **Instant Translation:** Powered by **GPT-4o**, messages are translated instantly between the patient's and doctor's preferred languages. Supports 11 languages including English, Spanish, Hindi, French, German, Chinese, Japanese, Arabic, Portuguese, Russian, and Telugu.
-*   **Zero-Lag Architecture:** Uses an optimistic UI update pattern to show messages immediately while AI processing happens in the background.
-*   **Two-Phase Broadcast:** Original message appears instantly (Phase 1), translation follows within 1-3 seconds (Phase 2) via Socket.IO updates.
-
-### **2. Voice-First Communication**
-*   **Whisper Integration:** Voice notes are automatically transcribed into text using **OpenAI Whisper (large-v3-turbo)**.
-*   **Cross-Language Audio:** Audio transcripts are also translated, allowing a doctor to "read" a patient's spoken Spanish as English text.
-*   **Cloud Persistence:** Audio files persisted to **Cloudinary** with CDN delivery.
-
-### **3. Professional Medical Workflow**
-*   **Role-Based Access:** Distinct portals for Doctors (Queue Management) and Patients (Consultation Requests).
-*   **AI-Powered Summaries:** GPT-4o generates structured clinical notes (symptoms, diagnosis, plan) when consultations end.
-*   **Secure History:** All consultations are persistently stored in **PostgreSQL**.
-
-### **4. Enterprise-Grade Security**
-*   **JWT Authentication:** Email/password sign-up with bcrypt hashing and JWT tokens stored in `httpOnly` cookies (XSS protection).
-*   **CSRF Protection:** `SameSite=Lax` cookie policy prevents cross-site request forgery attacks.
-*   **Role Guards:** Backend authorization checks on every protected endpoint.
 
 ---
 
 ## 🛠️ Tech Stack
 
-*   **Frontend:** React 18 (TypeScript), Vite, Tailwind CSS, shadcn/ui, Socket.io-client
-*   **Backend:** FastAPI (Python), Python-Socket.io (ASGI), SQLAlchemy 2.x ORM
-*   **Database:** PostgreSQL (with indexed foreign keys for performance)
-*   **Cloud Storage:** Cloudinary (persistent audio file storage with CDN delivery)
-*   **AI Services:**
-    *   **Translation:** GPT-4o via GitHub Models (`models.inference.ai.azure.com`)
-    *   **Transcription:** OpenAI Whisper (large-v3-turbo)
-    *   **Summarization:** GPT-4o with medical prompt engineering
-*   **Security:** python-jose (JWT), BCrypt (passlib), CORS middleware, CSP headers
-*   **Deployment:** Vercel (frontend), Render (backend + managed PostgreSQL)
+| Layer | Technology |
+|:---|:---|
+| **Frontend** | React 18 (TypeScript), Vite, Tailwind CSS, shadcn/ui, TanStack Query, socket.io-client |
+| **Backend** | FastAPI (Python 3.13), python-socketio (ASGI), SQLAlchemy 2.x ORM, Uvicorn |
+| **Database** | PostgreSQL (Render managed), SQLAlchemy connection pool |
+| **AI Services** | GPT-4o (translation, summarization), OpenAI Whisper large-v3-turbo (transcription) |
+| **Storage** | Cloudinary (persistent audio CDN) |
+| **Security** | python-jose (JWT), passlib/bcrypt, custom ASGI middleware (rate limit, XSS, CSP) |
+| **Testing** | pytest, FastAPI TestClient, SQLite (in-memory), autouse fixtures |
+| **Deployment** | Vercel (frontend), Render (backend + managed PostgreSQL) |
 
 ---
 
-## ⚙️ Setup & Installation
+## ⚡ Recent Production-Ready Improvements
+
+| Improvement | Impact |
+|:---|:---|
+| **16-case automated security test suite** | Catches regressions in auth, XSS, SQL injection, rate limiting before every deploy |
+| **SQLAlchemy connection pooling** | Prevents connection exhaustion under concurrent load on Render's free tier |
+| **Enforced `wss://` in production** | All real-time traffic encrypted; derived automatically from `VITE_API_URL` |
+| **httpOnly JWT cookies** | Eliminates XSS token theft; replaces `localStorage` approach |
+| **Cursor-based pagination** | Handles 10,000+ message sessions; prevents browser OOM |
+| **Cloudinary audio persistence** | Survives Render redeploys; CDN delivery for low-latency playback |
+| **Two-Phase Broadcast** | Masks GPT-4o latency; messages appear instantly, translation follows |
+| **Telugu language support** | 11th supported language added to real-time translation pipeline |
+
+---
+
+## ⚙️ Local Setup
 
 **Prerequisites:** Python 3.11+, Node.js 18+, PostgreSQL 14+
 
-### 1. Clone the Repository
+### 1. Clone
 ```bash
 git clone https://github.com/b-rahul07/medibridge-connect.git
 cd medibridge-connect
 ```
 
-### 2. Backend Setup
+### 2. Backend
 ```bash
-cd backend
-python -m venv ../.venv
-source ../.venv/bin/activate  # On Windows: ..\.venv\Scripts\activate
-pip install -r requirements.txt
+# Create and activate virtual environment (from project root)
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # macOS/Linux
 
-# Configure Environment
-# Create a .env file with: DATABASE_URL, JWT_SECRET, GITHUB_TOKEN
-# Optional: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, USE_CLOUDINARY=true
-cp .env.example .env
+# Install dependencies
+pip install -r backend/requirements.txt
 
-# Run database schema
-psql -U postgres -d medibridge -f schema.sql
+# Configure environment
+cp backend/.env.example backend/.env
+# Edit backend/.env — set DATABASE_URL, JWT_SECRET, GITHUB_TOKEN
+# Optional: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 
-# Start Server (from backend directory)
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Apply database schema
+psql -U postgres -d medibridge -f backend/schema.sql
+
+# Start backend (from project root)
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --app-dir backend
 ```
 
-### 3. Frontend Setup
+### 3. Frontend
 ```bash
 # From project root
 npm install
 npm run dev
-# → Opens at http://localhost:8080
+# → http://localhost:5173
+```
+
+### 4. Run Tests
+```bash
+# From project root
+.venv\Scripts\python.exe -m pytest backend\tests\test_auth_security.py -v --tb=short
 ```
 
 ---
 
-## 🏗️ Architecture
+## ⚠️ Known Limitations & Production Path
 
-```ascii
-┌──────────────────────────────────────┐
-│         Browser (React SPA)          │
-│  React Router · TanStack Query       │
-│  socket.io-client · Tailwind         │
-└──────────┬───────────────┬───────────┘
-           │   REST API    │  Socket.IO
-           ▼               ▼
-┌──────────────────────────────────────┐
-│        FastAPI + python-socketio     │
-│  /auth    /consultations    /chat    │
-│  /ai/translate    /ai/summarize      │
-│                                      │
-│  ┌────────────┐  ┌────────────────┐  │
-│  │ JWT Auth   │  │ AI Service     │  │
-│  │ bcrypt     │  │ GPT-4o         │  │
-│  │            │  │ Whisper        │  │
-│  └────────────┘  └────────────────┘  │
-└──────────┬───────────────────────────┘
-           │
-           ▼
-┌──────────────────────────────────────┐
-│           PostgreSQL                 │
-│  users · sessions · messages         │
-└──────────────────────────────────────┘
-```
-
-### **Key Design Decisions**
-*   **FastAPI over Node.js:** Leveraged Python's superior AI/ML ecosystem (OpenAI SDK) and native support for asynchronous background tasks.
-*   **Two-Phase Broadcast:** Masked GPT-4o's 1-3s processing latency by decoupling message delivery from translation.
-*   **REST + Socket.IO Hybrid:** Used REST for transactional reliability (Auth, Session Creation) and Socket.IO for real-time low-latency updates.
-
----
-
-### **⚠️ Known Limitations & Production Path**
 | Limitation | Impact | Production Path |
-|:--- |:--- |:--- |
-| **HIPAA Compliance** | Prototype lacks official audit logging and BAA-certified hosting. | Migration to Azure Health or AWS HealthLake for certified infra. |
-| **Single Target Lang** | Sessions are limited to one translation direction at a time. | Implement a fan-out pipeline for multi-party/multi-lang sessions. |
-| **Keyword Search** | Uses PostgreSQL ILike, which lacks semantic context. | Implement pgvector for RAG-based clinical semantic search. |
-| **Scaling** | Socket.IO uses in-memory manager; not ready for multi-node. | Integration of a Redis adapter for state synchronization. |
+|:---|:---|:---|
+| **HIPAA Compliance** | Prototype lacks official audit logging and BAA-certified hosting | Migrate to Azure Health Data Services or AWS HealthLake |
+| **Single translation direction** | Sessions limited to one language pair at a time | Fan-out pipeline for multi-party/multi-language sessions |
+| **Keyword search only** | PostgreSQL `ILIKE` lacks semantic context | Add `pgvector` for RAG-based clinical semantic search |
+| **Single-node Socket.IO** | In-memory event manager; not horizontally scalable | Redis adapter for multi-node state synchronization |
 
 ---
 
 ## 📝 License
 
-MIT License - See LICENSE for details.
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Built for Healthcare Accessibility**  
-by [Rahul B](https://github.com/b-rahul07)
+**Built for Healthcare Accessibility** · by [Rahul B](https://github.com/b-rahul07)
