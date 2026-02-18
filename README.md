@@ -21,7 +21,7 @@ A production-deployed, full-stack platform enabling real-time multilingual medic
 
 ## 🎬 Demo
 
-<video src="https://github.com/b-rahul07/medibridge-connect/raw/main/Medibridge.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/d25444b5-b55b-4976-aca3-bca1fe5452b3
 
 ---
 
